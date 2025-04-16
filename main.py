@@ -3,10 +3,10 @@ from plots import *
 
 # Generate all the figures.
 
-def main(fig1 = True, collect_param_data=True, fig2=True, fig3a=True, fig3b=True):
+def main(fig1b = True, collect_param_data=True, fig2=True, fig3a=True, fig3b=True, fig4a=True, collect_px_data=True):
 	# Figure 1b
-	if fig1:
-		single_plot(a=0.001, b=0.01, c=0.01, sigma=10,beta=5,N=100, T=2000)
+	if fig1b:
+		single_plot(a=0.001, b=0.01, c=0.01, sigma=20,beta=50,N=100, T=2000)
 
 	# collect param_variation data
 	if collect_param_data:
@@ -24,17 +24,19 @@ def main(fig1 = True, collect_param_data=True, fig2=True, fig3a=True, fig3b=True
 
 		# sigma varies from 1 to 25, anchor 10
 		sigma_lst = np.linspace(1,25,25)
-		sigma_lst = np.insert(sigma_lst, 0, 10)
+		sigma_lst = np.insert(sigma_lst, 0, 20)
 
-		# beta varies from 1 to 10, anchor 5
-		beta_lst = np.linspace(1,10,10)
-		beta_lst = np.insert(beta_lst, 0, 10)
+		# beta varies from 1 to 10, anchor 10
+		beta_lst = np.exp(np.linspace(np.log(0.05),np.log(50),25))
+		beta_lst = np.insert(beta_lst, 0, 50)
 
 		collect_data_param_variation(a_lst, b_lst, c_lst, sigma_lst, beta_lst, N=100, T=3000)
 
 	# Figure 2a,b
 	if fig2:
-		plot_param_variation()
+		k0, k1 = plot_param_variation()
+		print(r'k0 = {:.5e}'.format(k0), flush=True)
+		print('k1 = {:.5}'.format(k1), flush=True)
 
 	# Figure 3a
 	if fig3a:
@@ -45,6 +47,10 @@ def main(fig1 = True, collect_param_data=True, fig2=True, fig3a=True, fig3b=True
 		delta_p = plot_random_task(a=0.001, b=0.01, c=0.01, N=100, T=4000)
 		print(r'Average $|\Delta \hat P|$ from .75 completed to end is {}'.format(delta_p), flush=True)
 
+	# Figure 4a
+	if fig4a:
+		px_vs_constraint(sigma=2, beta=10, p_high=0.99, N=100, nsamples=100, collect_data=collect_px_data)
+
 	return
 
-main(collect_param_data=False)
+main(collect_param_data=False, fig1b=False, fig3b=False, collect_px_data=True)

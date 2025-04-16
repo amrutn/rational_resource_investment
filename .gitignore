@@ -1,7 +1,9 @@
 # data
 *.npy
 *.npz
+*.png
 param_vary_data/
+px_data/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
