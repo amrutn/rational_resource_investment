@@ -54,10 +54,10 @@ def gen_dist(sigma, beta, N=100):
 
 	# final dist:
 	dist = np.zeros((N, N, 2))
-    dist[:, :, 1] = p_y1       # P(y=1|x)
-    dist[:, :, 0] = 1 - p_y1   # P(y=0|x)
+	dist[:, :, 1] = p_y1       # P(y=1|x)
+	dist[:, :, 0] = 1 - p_y1   # P(y=0|x)
 
-    return dist
+	return dist
 
 def gen_samples(num_samples, dist):
 	"""
@@ -81,13 +81,13 @@ def gen_samples(num_samples, dist):
 	coords = rng.integers(0,high=N,size=(num_samples,2))
 
 	# Probability of y=1 for each of these coordinates
-	P_y1 = dist[coords[:,0],coords[:,1]]
+	P_y1 = dist[coords[:,0],coords[:,1],1]
 
 	# Stochastically assign labels 1 or 0
 	rand_nums = rng.uniform(size=num_samples)
 	labels = rand_nums < P_y1
 
-	return np.hstack((R,labels[:,None]))
+	return np.hstack((coords,labels[:,None]))
 
 
 # Compute g_1'/P^*(x)
