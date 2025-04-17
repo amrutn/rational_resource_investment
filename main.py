@@ -3,7 +3,7 @@ from plots import *
 
 # Generate all the figures.
 
-def main(fig1b = True, collect_param_data=True, fig2=True, fig3a=True, fig3b=True, fig4a=True, collect_px_data=True):
+def main(fig1b = True, collect_param_data=True, fig2=True, fig3a=True, fig3b=True, fig4=True, collect_px_data=True):
 	# Figure 1b
 	if fig1b:
 		single_plot(a=0.001, b=0.01, c=0.01, sigma=20,beta=50,N=100, T=2000)
@@ -47,10 +47,10 @@ def main(fig1b = True, collect_param_data=True, fig2=True, fig3a=True, fig3b=Tru
 		delta_p = plot_random_task(a=0.001, b=0.01, c=0.01, N=100, T=4000)
 		print(r'Average $|\Delta \hat P|$ from .75 completed to end is {}'.format(delta_p), flush=True)
 
-	# Figure 4a
-	if fig4a:
-		px_vs_constraint(sigma=2, beta=10, p_high=0.99, N=100, nsamples=100, collect_data=collect_px_data)
+	# Figure 4
+	if fig4:
+		px_vs_constraint(sigma=20, beta=50, p_high=0.99, N=100, nsamples=1000, collect_data=collect_px_data)
 
 	return
 
-main(collect_param_data=False, fig1b=False, fig3b=False, collect_px_data=True)
+main(collect_param_data=False, fig1b=False, fig3b=False, collect_px_data=False)

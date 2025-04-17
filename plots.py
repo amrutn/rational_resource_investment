@@ -6,7 +6,6 @@ import matplotlib as mpl
 from scipy.optimize import curve_fit
 from pathlib import Path
 from dynamics_functions import *
-from dynamics_functions_joint import *
 from tqdm import tqdm
 
 mpl.rcParams['axes.linewidth'] = 2
@@ -350,8 +349,6 @@ def plot_param_variation():
 	The data paths are automatically chosen as the output paths in the 
 	collect_data_param_variation function. 
 	"""
-
-	
 
 	# First plot the a,b,c variation figure.
 
@@ -765,7 +762,8 @@ def plot_random_task(a, b, c, N=100, T=3000, p0=None):
 
 	return delta_p
 
-# Figure 4a, heatmap of constraint functions for different P(x)
+
+# Figure 4, heatmap of constraint functions for different P(x)
 def px_vs_constraint(sigma, beta, p_high=0.99, N=100, nsamples=100, collect_data=True):
 	"""
 	For each possible perimeter and area of the high likelihood rectangle, as 
@@ -798,10 +796,16 @@ def px_vs_constraint(sigma, beta, p_high=0.99, N=100, nsamples=100, collect_data
 		vols = []
 		perimeters = []
 		areas = []
-		for h in tqdm(range(2,N-10)):
-			for w in range(h,N-10):
+		entropies = []
+		dimensions = []
+		for h in tqdm(range(2,N-10,2)):
+			for w in range(h,N-10,2):
 				# P(x) for the given width and height of the rectangle
 				px = gen_dist_x(w, h, p_high=p_high, N=N)
+				# compute entropy of distribution
+				entropy = compute_entropy(px)
+				# Compute effective dimension (skewness)
+				d_eff = compute_d_eff_x(px)
 				mi = 0
 				vol = 0
 				for i in range(nsamples):
@@ -814,51 +818,65 @@ def px_vs_constraint(sigma, beta, p_high=0.99, N=100, nsamples=100, collect_data
 				vols.append(vol)
 				perimeters.append(2*(w+h))
 				areas.append(w*h)
+				entropies.append(entropy)
+				dimensions.append(d_eff)
 
 		np.save('px_data/mis', mis)
 		np.save('px_data/vols', vols)
 		np.save('px_data/areas', areas)
 		np.save('px_data/perimeters', perimeters)
+		np.save('px_data/entropies', entropies)
+		np.save('px_data/dimensions', dimensions)
 
 	mis = np.load('px_data/mis.npy')
 	vols = np.load('px_data/vols.npy')
-	perimeters = np.load('px_data/perimeters.npy')
-	areas = np.load('px_data/areas.npy')
+	entropies = np.load('px_data/entropies.npy')
+	dimensions = np.load('px_data/dimensions.npy')
 
 	mis = np.nan_to_num(mis)
 	vols = np.nan_to_num(vols)
 
-	# Make figure for mi, vol and mi-vol
-	fig,axes = plt.subplots(1,3, figsize=(7.0,2.1), layout="constrained")
-	sc0 = axes[0].scatter(perimeters, np.sqrt(areas), # Use your 1D coordinate arrays
-                 c=mis,           # Use your 1D data array for color
-                 cmap='Reds',        # Choose a colormap
+	# Make figure for mi, vol
+	fig,axes = plt.subplots(1,3, figsize=(7.5,3), layout="constrained")
+	ylim=(2.5,9.5)
+	sc0 = axes[0].scatter(dimensions, entropies, 
+                 c=np.exp(mis),           
+                 cmap='Purples',        # Choose a colormap
                  marker='s',            # Use square markers
-                 s=1          # Set marker size
+                 s=2, alpha=1.0          # Set marker size
                 )
-	cbar0 = plt.colorbar(sc0)
-	cbar0.set_label(r'Predictability ($g_1[P]$)')
-	axes[0].set_ylabel(r'$\sqrt{}$Area')
+	cbar0 = plt.colorbar(sc0, location='top')
+	cbar0.set_label(r'Predictability: $\exp(g_1[P])$')
+	axes[0].set_ylabel(r'Measurement Cost: $H[X]$')
+	axes[0].set_ylim(ylim)
 
-	sc1 = axes[1].scatter(perimeters, np.sqrt(areas), # Use your 1D coordinate arrays
-                 c=-vols,           # Use your 1D data array for color
-                 cmap='Reds',        # Choose a colormap
+	sc1 = axes[1].scatter(dimensions, entropies,
+                 c=np.exp(-vols),
+                 cmap='Purples',        # Choose a colormap
                  marker='s',            # Use square markers
-                 s=1          # Set marker size
+                 s=2, alpha=1.0,          # Set marker size
+                 vmax = np.exp(-vols.mean()+1.5*vols.std()),
+                 vmin = np.exp(-vols.mean()-1.5*vols.std())
                 )
-	cbar1 = plt.colorbar(sc1)
-	cbar1.set_label(r'Smoothness ($-g_2[P])$')
-	axes[1].set_xlabel('Perimeter')
+	cbar1 = plt.colorbar(sc1, location='top')
+	cbar1.set_label(r'Smoothness: $\exp(-g_2[P])$')
+	axes[1].set_yticks([])
+	axes[1].set_ylim(ylim)
 
-	sc2 = axes[2].scatter(perimeters, np.sqrt(areas), # Use your 1D coordinate arrays
-                 c=mis - vols,           # Use your 1D data array for color
-                 cmap='Reds',        # Choose a colormap
+	sc2 = axes[2].scatter(dimensions, entropies,
+                 c=np.exp(mis-mis.std()/vols.std()*vols),
+                 cmap='Purples',        # Choose a colormap
                  marker='s',            # Use square markers
-                 s=1          # Set marker size
+                 s=2, alpha=1.0,          # Set marker size
+                 vmax=0.085
                 )
-	cbar2 = plt.colorbar(sc2)
-	cbar2.set_label(r'$g_1[P] - g_2[P]$')
+	cbar2 = plt.colorbar(sc2, location='top')
+	cbar2.set_label(r'Combined: $\exp(g_1[P]-kg_2[P])$')
+	axes[2].set_yticks([])
+	axes[2].set_ylim(ylim)
 
-	fig.savefig('fig4a.png', format='png', dpi=500)
+	fig.supxlabel(r'Cue Distribution Effective Dimension: $D_{\mathrm{eff}}[P(x)]$')
+
+	fig.savefig('fig4.png', format='png', dpi=500)
 
 
