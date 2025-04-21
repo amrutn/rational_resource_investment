@@ -409,7 +409,7 @@ def plot_param_variation():
 	fitted_curve_f0 = f0(a_lst, k0)
 
 	# Plot latency, abruptness, final accuracy vs a
-	axes[0].set_xlabel(r"Data Source Strength ($a$)")
+	axes[0].set_xlabel(r"Data Source ($a$)")
 	axes[0].set_xscale('log')
 	axes[0].set_ylabel('Latency', color='red')
 	axes[0].scatter(a_lst, latencies_a, c='red', marker='o', alpha=.5)
@@ -430,7 +430,7 @@ def plot_param_variation():
 
 
 	# Plot transition rates and times vs b
-	axes[1].set_xlabel(r'Diffusion ($b$)')
+	axes[1].set_xlabel(r'Smoothness ($b$)')
 	axes[1].set_xscale('log')
 	axes[1].set_yticks([])
 	axes[1].scatter(b_lst, latencies_b, c='red', marker='o', alpha=.5)
@@ -461,7 +461,7 @@ def plot_param_variation():
 	label = r'$-\frac{1}{c}\log (k_0 a)$'
 	axes[2].plot(c_lst[1:], fitted_curve_f2[1:], 'r-', label=label)
 	axes[2].set_ylim(*times_ylim)
-	axes[2].annotate(label, (0.02,0.35), xycoords='axes fraction', color='red', rotation=-50)
+	axes[2].annotate(label, (0.34,0.07), xycoords='axes fraction', color='red', rotation=0)
 
 	twin_ax2 = axes[2].twinx()
 	twin_ax2.set_ylabel(r'Abruptness ($\times 10^{-3}$)', color='blue')
@@ -663,7 +663,7 @@ def plot_random_task(a, b, c, N=100, T=3000, p0=None):
 	# Plot change in P over time
 	ax.plot(t[1:], dp_dt*10000, 'k', linewidth=3)
 	ax.set_xlabel('Time')
-	ax.set_ylabel(r'Avg. $|d\hat P_t/dt|$ ($\times 10^4$)')
+	ax.set_ylabel(r'Mean $|d\hat P_t/dt|$ ($\times 10^4$)')
 
 	# Create inset with final dist
 	inset_bounds = [0.65, 0.65, 0.3, 0.3] # inset location, size
@@ -791,92 +791,95 @@ def px_vs_constraint(sigma, beta, p_high=0.99, N=100, nsamples=100, collect_data
 		data_folder = Path("px_data")
 		data_folder.mkdir(parents=True, exist_ok=True)
 
-		# loop through possible heights and widths of the high-likelihood region
-		mis = []
-		vols = []
-		perimeters = []
-		areas = []
+		# create all the P(x) for each width and height
+		# limit the range to avoid effects from tiny boxes
+		# and from forcing p(Y)=.5 after marginalization
+		x_dists = []
 		entropies = []
 		dimensions = []
-		for h in tqdm(range(2,N-10,2)):
-			for w in range(h,N-10,2):
-				# P(x) for the given width and height of the rectangle
+		ws = []
+		hs = []
+		for h in range(int(.25*N),int(.75*N)):
+			for w in range(2,int(.75*N)):
 				px = gen_dist_x(w, h, p_high=p_high, N=N)
-				# compute entropy of distribution
-				entropy = compute_entropy(px)
-				# Compute effective dimension (skewness)
-				d_eff = compute_d_eff_x(px)
-				mi = 0
-				vol = 0
-				for i in range(nsamples):
-					py_x = gen_dist_cond(sigma, beta, N=N)
+				x_dists.append(px)
+				entropies.append(compute_entropy(px))
+				dimensions.append(compute_d_eff_x(px))
+				ws.append(w)
+				hs.append(h)
 
-					mi += compute_mi_joint(px,py_x)/nsamples
-					vol += compute_vol_joint(px,py_x)/nsamples
+		# compute MI and vol for each x dist over nsamples samples of P(y|x)
+		all_mis = []
+		all_vols = []
+		for i in tqdm(range(nsamples)):
+			py_x = gen_dist_cond(sigma, beta, N=N)
+			mis = []
+			vols = []
+			for px in x_dists:
+				mis.append(compute_mi_joint(px,py_x))
+				vols.append(compute_vol_joint(px,py_x))
+			all_mis.append(mis)
+			all_vols.append(vols)
 
-				mis.append(mi)
-				vols.append(vol)
-				perimeters.append(2*(w+h))
-				areas.append(w*h)
-				entropies.append(entropy)
-				dimensions.append(d_eff)
 
-		np.save('px_data/mis', mis)
-		np.save('px_data/vols', vols)
-		np.save('px_data/areas', areas)
-		np.save('px_data/perimeters', perimeters)
+		all_mis = np.array(all_mis)
+		all_vols = np.array(all_vols)
+
+		np.save('px_data/mis', all_mis)
+		np.save('px_data/vols', all_vols)
+		np.save('px_data/ws', ws)
+		np.save('px_data/hs', hs)
 		np.save('px_data/entropies', entropies)
 		np.save('px_data/dimensions', dimensions)
 
-	mis = np.load('px_data/mis.npy')
-	vols = np.load('px_data/vols.npy')
+	mis = np.load('px_data/mis.npy').mean(axis=0)
+	vols = np.load('px_data/vols.npy').mean(axis=0)
 	entropies = np.load('px_data/entropies.npy')
 	dimensions = np.load('px_data/dimensions.npy')
 
-	mis = np.nan_to_num(mis)
-	vols = np.nan_to_num(vols)
 
-	# Make figure for mi, vol
-	fig,axes = plt.subplots(1,3, figsize=(7.5,3), layout="constrained")
-	ylim=(2.5,9.5)
+	# make figures for mis, vols
+	fig,axes = plt.subplots(1,3, figsize=(7,2.8), layout="constrained")
+
 	sc0 = axes[0].scatter(dimensions, entropies, 
                  c=np.exp(mis),           
                  cmap='Purples',        # Choose a colormap
                  marker='s',            # Use square markers
-                 s=2, alpha=1.0          # Set marker size
+                 s=2        # Set marker size
                 )
 	cbar0 = plt.colorbar(sc0, location='top')
 	cbar0.set_label(r'Predictability: $\exp(g_1[P])$')
 	axes[0].set_ylabel(r'Measurement Cost: $H[X]$')
-	axes[0].set_ylim(ylim)
 
 	sc1 = axes[1].scatter(dimensions, entropies,
                  c=np.exp(-vols),
                  cmap='Purples',        # Choose a colormap
                  marker='s',            # Use square markers
-                 s=2, alpha=1.0,          # Set marker size
-                 vmax = np.exp(-vols.mean()+1.5*vols.std()),
-                 vmin = np.exp(-vols.mean()-1.5*vols.std())
+                 s=2,      				# Set marker size
                 )
 	cbar1 = plt.colorbar(sc1, location='top')
 	cbar1.set_label(r'Smoothness: $\exp(-g_2[P])$')
 	axes[1].set_yticks([])
-	axes[1].set_ylim(ylim)
 
+	mean_mi_dev = np.abs(mis-mis.mean()).mean()
+	mean_vol_dev = np.abs(vols-vols.mean()).mean()
+
+	combined = np.exp(mis-mean_mi_dev/mean_vol_dev*vols)
 	sc2 = axes[2].scatter(dimensions, entropies,
-                 c=np.exp(mis-mis.std()/vols.std()*vols),
+                 c=combined,
                  cmap='Purples',        # Choose a colormap
                  marker='s',            # Use square markers
-                 s=2, alpha=1.0,          # Set marker size
-                 vmax=0.085
+                 s=2,         # Set marker size
                 )
 	cbar2 = plt.colorbar(sc2, location='top')
-	cbar2.set_label(r'Combined: $\exp(g_1[P]-kg_2[P])$')
+	cbar2.set_label(r'Combined: $\exp(g_1[P]-{:.1f}g_2[P])$'.format(mean_mi_dev/mean_vol_dev))
 	axes[2].set_yticks([])
-	axes[2].set_ylim(ylim)
 
 	fig.supxlabel(r'Cue Distribution Effective Dimension: $D_{\mathrm{eff}}[P(x)]$')
 
 	fig.savefig('fig4.png', format='png', dpi=500)
+
+	print(mean_mi_dev/mean_vol_dev, flush=True)
+
 
 

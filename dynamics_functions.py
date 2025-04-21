@@ -265,7 +265,7 @@ def get_dist(samples, a, b, c, p0=None, N=100, T=1000):
 
 # Functions for computing with the joint distribution
 
-def create_smoothed_rectangle_array(N, w, h, high_val, low_val, transition_steps=3):
+def create_rectangle_array(N, w, h, high_val, low_val):
     """
     Helper function for generating P(x)
     Creates an N x N array with a central w x h rectangle of high_val
@@ -283,9 +283,6 @@ def create_smoothed_rectangle_array(N, w, h, high_val, low_val, transition_steps
     	Value inside the central rectangle.
     low_val : float
     	Background value far from the rectangle.
-    transition_steps : int
-    	Number of steps over which the value
-        transitions from high_val to low_val.
 
     Returns
     -------
@@ -294,8 +291,6 @@ def create_smoothed_rectangle_array(N, w, h, high_val, low_val, transition_steps
     """
     if w > N or h > N:
         raise ValueError("Rectangle dimensions (w, h) cannot exceed array size N")
-    if transition_steps <= 0:
-        raise ValueError("transition_steps must be positive")
 
     # Initialize array with low_val
     arr = np.full((N, N), low_val, dtype=float)
@@ -307,38 +302,6 @@ def create_smoothed_rectangle_array(N, w, h, high_val, low_val, transition_steps
     # Fill the high value rectangle directly first
     arr[horiz[0]:horiz[1], vert[0]:vert[1]] = high_val
 
-    # Iterate through all cells to calculate smoothed values outside the rectangle
-    for r in range(N):
-        for c in range(N):
-            # Skip cells already inside the high_val rectangle
-            if horiz[0] <= r < horiz[1] and vert[0] <= c < vert[1]:
-                continue
-
-            # Calculate Chebyshev distance to the rectangle boundary
-            if r < horiz[0]:
-                dr = horiz[0] - r
-            elif r > horiz[1]:
-                dr = r - horiz[1] + 1
-            else:
-                dr = 0
-
-            if c < vert[0]:
-                dc = vert[0] - c
-            elif c > vert[1]:
-                dc = c - vert[1] + 1
-            else:
-                dc = 0
-
-            # Chebyshev distance is the max of the two
-            dist = max(dr, dc)
-
-            # Calculate the smoothed value based on distance
-            if dist <= transition_steps:
-                 # Linear interpolation from high_val down to low_val over transition_steps
-                 value = low_val + (high_val-low_val) * (1-dist/transition_steps)
-            else:
-                # Beyond the transition zone, it's just low_val (already set)
-                arr[r, c] = low_val
 
     return arr
 
@@ -376,7 +339,7 @@ def gen_dist_x(w, h, p_high=0.99, N=100):
 	assert w < N-10
 	assert h < N-10
 
-	p_x = create_smoothed_rectangle_array(N, w, h, high_val=p_high/(w*h), low_val=(1-p_high)/(N**2-w*h), transition_steps=5)
+	p_x = create_rectangle_array(N, w, h, high_val=p_high/(w*h), low_val=(1-p_high)/(N**2-w*h))
 	p_x /= p_x.sum() # enforcing exact normalization
 
 	return p_x[:,:,None]
@@ -435,7 +398,7 @@ def compute_vol_joint(px,py_x):
 	p4y_x[:,-1] = py_x[:,-1] # Boundary condition
 
 	return (px*py_x*(4*np.log(py_x+eps) - np.log(p1y_x+eps) - 
-		np.log(p2y_x+eps) - np.log(p3y_x+eps) - np.log(p4y_x+eps))).sum()
+		np.log(p2y_x+eps) - np.log(p3y_x+eps) - np.log(p4y_x+eps))).sum(axis=-1)[px[:,:,0]>0].sum()
 
 def compute_entropy(p):
 	"""

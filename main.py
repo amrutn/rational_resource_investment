@@ -22,7 +22,7 @@ def main(fig1b = True, collect_param_data=True, fig2=True, fig3a=True, fig3b=Tru
 		c_lst = np.linspace(.001,0.02,20)
 		c_lst = np.insert(c_lst, 0, .01)
 
-		# sigma varies from 1 to 25, anchor 10
+		# sigma varies from 1 to 25, anchor 20
 		sigma_lst = np.linspace(1,25,25)
 		sigma_lst = np.insert(sigma_lst, 0, 20)
 
@@ -49,8 +49,7 @@ def main(fig1b = True, collect_param_data=True, fig2=True, fig3a=True, fig3b=Tru
 
 	# Figure 4
 	if fig4:
-		px_vs_constraint(sigma=20, beta=50, p_high=0.99, N=100, nsamples=1000, collect_data=collect_px_data)
-
+		px_vs_constraint(sigma=30, beta=50, p_high=1.0, N=100, nsamples=1000, collect_data=collect_px_data)
 	return
 
-main(collect_param_data=False, fig1b=False, fig3b=False, collect_px_data=False)
+main(collect_param_data=False, collect_px_data=True, fig1b=False,fig2=False, fig3a=False, fig3b=False)
