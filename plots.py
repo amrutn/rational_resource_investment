@@ -14,6 +14,104 @@ plt.rcParams.update({
 })
 
 
+# Figure 1, heatmap of constraint functions for different P(x)
+def px_vs_constraint(sigma, beta, p_high=0.99, N=100, nsamples=100, collect_data=True):
+	"""
+	For each possible perimeter and area of the high likelihood rectangle, as 
+	controlled by its width and height, plot the value of the mutual information, volatility
+	and their sum when sampling P(y|x) over fixed sigma, beta many times to avoid bias.
+
+	Params
+	------
+	sigma : float
+		Standard deviation of the Gaussian smoothing filter, 
+		controls volatility. Larger sigma = smoother field for P(y|x).
+	beta : float
+		Gain of the sigmoid nonlinearity, controls uncertainty.
+		Larger gain = probabilities closer to 0 or 1 for P(y|x).
+	p_high : float
+		The probability of the high-likelihood region of P(x)
+	N : int
+		Size of the grid on each side
+	nsamples : int
+		Number of times to sample each P(y|x)
+	collect_data : bool
+		If true, generate data for the plots
+	"""
+	if collect_data:
+		data_folder = Path("px_data")
+		data_folder.mkdir(parents=True, exist_ok=True)
+
+		# create all the P(x) for each width and height
+		# limit the range to avoid effects from tiny boxes
+		# and from forcing p(Y)=.5 after marginalization
+		x_dists = []
+		entropies = []
+		dimensions = []
+		ws = []
+		hs = []
+		for h in range(int(.25*N),int(.75*N)):
+			for w in range(2,int(.75*N)):
+				px = gen_dist_x(w, h, p_high=p_high, N=N)
+				x_dists.append(px)
+				entropies.append(compute_entropy(px))
+				dimensions.append(compute_d_eff_x(px))
+				ws.append(w)
+				hs.append(h)
+
+		# compute MI and vol for each x dist over nsamples samples of P(y|x)
+		all_mis = []
+		all_vols = []
+		for i in tqdm(range(nsamples)):
+			py_x = gen_dist_cond(sigma, beta, N=N)
+			mis = []
+			vols = []
+			for px in x_dists:
+				mis.append(compute_mi_joint(px,py_x))
+				vols.append(compute_vol_joint(px,py_x))
+			all_mis.append(mis)
+			all_vols.append(vols)
+
+
+		all_mis = np.array(all_mis)
+		all_vols = np.array(all_vols)
+
+		np.save('px_data/mis', all_mis)
+		np.save('px_data/vols', all_vols)
+		np.save('px_data/ws', ws)
+		np.save('px_data/hs', hs)
+		np.save('px_data/entropies', entropies)
+		np.save('px_data/dimensions', dimensions)
+
+	mis = np.load('px_data/mis.npy').mean(axis=0)
+	vols = np.load('px_data/vols.npy').mean(axis=0)
+	entropies = np.load('px_data/entropies.npy')
+	dimensions = np.load('px_data/dimensions.npy')
+
+
+	# make figures for mis, vols
+	mean_mi_dev = np.abs(mis-mis.mean()).mean()
+	mean_vol_dev = np.abs(vols-vols.mean()).mean()
+
+	combined = np.exp(mis-mean_mi_dev/mean_vol_dev*vols)
+
+	fig,ax = plt.subplots(1,1, figsize=(3,2.1), layout="constrained")
+	sc = ax.scatter(dimensions, entropies, 
+                 c=combined,           
+                 cmap='Purples',        # Choose a colormap
+                 marker='s',            # Use square markers
+                 s=2        # Set marker size
+                )
+	cbar = plt.colorbar(sc)
+	cbar.set_label(r'Prior Weight')
+	ax.set_ylabel(r'Measurement Cost: $H[X]$')
+	ax.set_xlabel(r'Cue Distribution Dimension')
+
+	fig.savefig('fig1b.png', format='png', dpi=500)
+
+	return mean_mi_dev/mean_vol_dev
+
+
 def single_plot(a, b, c, sigma, beta, N=100, T=1000, p0=None):
 	"""
 	Run a single associative learning experiment and plot task accuracy over time.
@@ -71,7 +169,7 @@ def single_plot(a, b, c, sigma, beta, N=100, T=1000, p0=None):
 	axs['BottomRight'].set_xticks([])
 	axs['BottomRight'].set_yticks([])
 
-	fig.savefig('fig1b.png', format='png', dpi=500)
+	fig.savefig('fig2b.png', format='png', dpi=500)
 
 
 def collect_data_param_variation(a_lst, b_lst, c_lst, sigma_lst, beta_lst, N=100, T=3000):
@@ -352,7 +450,7 @@ def plot_param_variation():
 
 	# First plot the a,b,c variation figure.
 
-	fig,axes = plt.subplots(1,3, figsize=(7.0,2.1), layout="constrained")
+	fig,axes = plt.subplots(1,3, figsize=(6.5,2.1), layout="constrained")
 	scale_rates=1000
 	rates_ylim = (0.002, 0.015)
 	times_ylim = (400,2500)
@@ -482,7 +580,7 @@ def plot_param_variation():
 
 
 	# save figure
-	fig.savefig("fig2a.png", format='png', dpi=500)
+	fig.savefig("fig3a.png", format='png', dpi=500)
 
 	# create figure for task variation
 	fig_task,axes_task = plt.subplots(1,2, figsize=(5.0,2.1), layout="constrained")
@@ -528,7 +626,7 @@ def plot_param_variation():
 
 
 	# save figure
-	fig_task.savefig("fig2b.png", format='png', dpi=500)
+	fig_task.savefig("fig3b.png", format='png', dpi=500)
 
 	return k0,k1
 
@@ -543,9 +641,8 @@ def plot_prior():
 	region. Thus, making the set of allowed hypotheses effectibely discrete.
 	"""
 
-	# Define binary entropy function h(p) = -p*ln(p) - (1-p)*ln(1-p)
 	def h(p):
-	    """Calculates binary entropy, handling p=0 and p=1 cases."""
+	    """Calculate binary entropy"""
 	    p = np.asarray(p) # Ensure input is array for vectorized ops
 	    # Use np.where to handle 0*log(0) = 0
 	    term1 = np.where(p == 0, 0.0, p * np.log(p))
@@ -560,45 +657,38 @@ def plot_prior():
 	    p0 = np.asarray(p0)
 	    p1 = np.asarray(p1)
 
-	    # Calculate marginal entropy H[Y]
-	    # P(y=1) = 0.5 * (p0 + p1)
+	    # Calculate H[Y]
 	    H_Y = h(0.5 * (p0 + p1))
 
-	    # Calculate conditional entropy H[Y|X] = 0.5*h(p0) + 0.5*h(p1)
+	    # Calculate H[Y|X]
 	    H_YcondX = 0.5 * h(p0) + 0.5 * h(p1)
 
 	    # Calculate mutual information I[X;Y] = H[Y] - H[Y|X]
-	    # Ensure non-negative due to potential floating point inaccuracies near zero
 	    IMI = np.maximum(0.0, H_Y - H_YcondX)
 
-	    # Return exponentiated value
 	    return np.exp(IMI)
 
-	# --- Set up grid ---
+	# Create grid of coordinates
 	num_points = 200 # Resolution of the grid
 	p0_vals = np.linspace(0, 1, num_points)
 	p1_vals = np.linspace(0, 1, num_points)
-	# Create 2D grid of coordinates
-	# Note: meshgrid indexing default is 'xy', P0 varies along x (columns), P1 along y (rows)
 	P0, P1 = np.meshgrid(p0_vals, p1_vals)
 
-	# --- Calculate V over the grid ---
+	# Compute V, plot
 	V_grid = V(P0, P1)
-
-	# --- Plotting ---
 	fig, ax = plt.subplots(figsize=(3.0,2.1), layout="constrained")
 
-	# Define the custom white-to-red colormap
+	# Define custom colormap
 	cmap_white_red = mcolors.LinearSegmentedColormap.from_list("white_red", ["white", "red"])
 
-	# display heatmap as img
+	# display heatmap
 	im = ax.imshow(V_grid,
 	               origin='lower',
 	               extent=[0, 1, 0, 1],
 	               cmap=cmap_white_red,
-	               vmin=1, # Value corresponding to white
-	               vmax=2, # Value corresponding to red
-	               aspect='equal' # Ensure the plot area is square
+	               vmin=1,
+	               vmax=2,
+	               aspect='equal'
 	              )
 
 	# set labels
@@ -617,11 +707,11 @@ def plot_prior():
 	cbar = fig.colorbar(im, ax=ax, fraction=0.05, pad=0.04)
 	cbar.set_label(r"$\exp(I[X;Y])$", rotation=270, labelpad=15)
 	# Set specific ticks on the colorbar
-	cbar.set_ticks(np.linspace(1, 2, 6)) # e.g., 6 ticks from 1.0 to 2.0
+	cbar.set_ticks(np.linspace(1, 2, 6))
 	cbar.ax.tick_params(labelsize=10)
 
 
-	fig.savefig("fig3a.png", format='png', dpi=500)
+	fig.savefig("fig4a.png", format='png', dpi=500)
 
 def plot_random_task(a, b, c, N=100, T=3000, p0=None):
 	"""
@@ -755,131 +845,12 @@ def plot_random_task(a, b, c, N=100, T=3000, p0=None):
 	axins.set_clip_on(False)
 	axins2.set_clip_on(False)
 
-	fig.savefig('fig3b.png', format='png', dpi=500)
+	fig.savefig('fig4b.png', format='png', dpi=500)
 
 	# return average change in probs at end of curve
 	delta_p = np.abs(ps[int(T*0.9)] - ps[-1]).mean()
 
 	return delta_p
-
-
-# Figure 4, heatmap of constraint functions for different P(x)
-def px_vs_constraint(sigma, beta, p_high=0.99, N=100, nsamples=100, collect_data=True):
-	"""
-	For each possible perimeter and area of the high likelihood rectangle, as 
-	controlled by its width and height, plot the value of the mutual information, volatility
-	and their sum when sampling P(y|x) over fixed sigma, beta many times to avoid bias.
-
-	Params
-	------
-	sigma : float
-		Standard deviation of the Gaussian smoothing filter, 
-		controls volatility. Larger sigma = smoother field for P(y|x).
-	beta : float
-		Gain of the sigmoid nonlinearity, controls uncertainty.
-		Larger gain = probabilities closer to 0 or 1 for P(y|x).
-	p_high : float
-		The probability of the high-likelihood region of P(x)
-	N : int
-		Size of the grid on each side
-	nsamples : int
-		Number of times to sample each P(y|x)
-	collect_data : bool
-		If true, generate data for the plots
-	"""
-	if collect_data:
-		data_folder = Path("px_data")
-		data_folder.mkdir(parents=True, exist_ok=True)
-
-		# create all the P(x) for each width and height
-		# limit the range to avoid effects from tiny boxes
-		# and from forcing p(Y)=.5 after marginalization
-		x_dists = []
-		entropies = []
-		dimensions = []
-		ws = []
-		hs = []
-		for h in range(int(.25*N),int(.75*N)):
-			for w in range(2,int(.75*N)):
-				px = gen_dist_x(w, h, p_high=p_high, N=N)
-				x_dists.append(px)
-				entropies.append(compute_entropy(px))
-				dimensions.append(compute_d_eff_x(px))
-				ws.append(w)
-				hs.append(h)
-
-		# compute MI and vol for each x dist over nsamples samples of P(y|x)
-		all_mis = []
-		all_vols = []
-		for i in tqdm(range(nsamples)):
-			py_x = gen_dist_cond(sigma, beta, N=N)
-			mis = []
-			vols = []
-			for px in x_dists:
-				mis.append(compute_mi_joint(px,py_x))
-				vols.append(compute_vol_joint(px,py_x))
-			all_mis.append(mis)
-			all_vols.append(vols)
-
-
-		all_mis = np.array(all_mis)
-		all_vols = np.array(all_vols)
-
-		np.save('px_data/mis', all_mis)
-		np.save('px_data/vols', all_vols)
-		np.save('px_data/ws', ws)
-		np.save('px_data/hs', hs)
-		np.save('px_data/entropies', entropies)
-		np.save('px_data/dimensions', dimensions)
-
-	mis = np.load('px_data/mis.npy').mean(axis=0)
-	vols = np.load('px_data/vols.npy').mean(axis=0)
-	entropies = np.load('px_data/entropies.npy')
-	dimensions = np.load('px_data/dimensions.npy')
-
-
-	# make figures for mis, vols
-	fig,axes = plt.subplots(1,3, figsize=(7,2.8), layout="constrained")
-
-	sc0 = axes[0].scatter(dimensions, entropies, 
-                 c=np.exp(mis),           
-                 cmap='Purples',        # Choose a colormap
-                 marker='s',            # Use square markers
-                 s=2        # Set marker size
-                )
-	cbar0 = plt.colorbar(sc0, location='top')
-	cbar0.set_label(r'Predictability: $\exp(g_1[P])$')
-	axes[0].set_ylabel(r'Measurement Cost: $H[X]$')
-
-	sc1 = axes[1].scatter(dimensions, entropies,
-                 c=np.exp(-vols),
-                 cmap='Purples',        # Choose a colormap
-                 marker='s',            # Use square markers
-                 s=2,      				# Set marker size
-                )
-	cbar1 = plt.colorbar(sc1, location='top')
-	cbar1.set_label(r'Smoothness: $\exp(-g_2[P])$')
-	axes[1].set_yticks([])
-
-	mean_mi_dev = np.abs(mis-mis.mean()).mean()
-	mean_vol_dev = np.abs(vols-vols.mean()).mean()
-
-	combined = np.exp(mis-mean_mi_dev/mean_vol_dev*vols)
-	sc2 = axes[2].scatter(dimensions, entropies,
-                 c=combined,
-                 cmap='Purples',        # Choose a colormap
-                 marker='s',            # Use square markers
-                 s=2,         # Set marker size
-                )
-	cbar2 = plt.colorbar(sc2, location='top')
-	cbar2.set_label(r'Combined: $\exp(g_1[P]-{:.1f}g_2[P])$'.format(mean_mi_dev/mean_vol_dev))
-	axes[2].set_yticks([])
-
-	fig.supxlabel(r'Cue Distribution Effective Dimension: $D_{\mathrm{eff}}[P(x)]$')
-
-	fig.savefig('fig4.png', format='png', dpi=500)
-
-	print(mean_mi_dev/mean_vol_dev, flush=True)
 
 
 
