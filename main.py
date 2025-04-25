@@ -54,4 +54,4 @@ def main(fig1b = True, collect_param_data=True, fig2b=True, fig3=True, fig4a=Tru
 		
 	return
 
-main(collect_param_data=False, collect_px_data=False, fig1b=False, fig2b=False, fig4a=False, fig4b=False)
+main(collect_param_data=False, collect_px_data=False, fig1b=False, fig2b=False, fig3=False, fig4a=False, fig4b=True)

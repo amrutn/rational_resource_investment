@@ -676,7 +676,7 @@ def plot_prior():
 
 	# Compute V, plot
 	V_grid = V(P0, P1)
-	fig, ax = plt.subplots(figsize=(3.0,2.1), layout="constrained")
+	fig, ax = plt.subplots(figsize=(2.75,2.1), layout="constrained")
 
 	# Define custom colormap
 	cmap_white_red = mcolors.LinearSegmentedColormap.from_list("white_red", ["white", "red"])
@@ -748,12 +748,12 @@ def plot_random_task(a, b, c, N=100, T=3000, p0=None):
 	# average magnitude of derivative of P_t(y|x) over time
 	dp_dt = np.abs(np.diff(ps, axis=0)).mean(axis=(1,2,3))
 
-	fig, ax = plt.subplots(figsize=(3.5,2.1), layout="constrained")
+	fig, ax = plt.subplots(figsize=(3.25,2.1), layout="constrained")
 	
 	# Plot change in P over time
 	ax.plot(t[1:], dp_dt*10000, 'k', linewidth=3)
 	ax.set_xlabel('Time')
-	ax.set_ylabel(r'Mean $|d\hat P_t/dt|$ ($\times 10^4$)')
+	ax.set_ylabel(r'Mean $|d\hat P_t/dt|$ ($\times 10^{-4}$)')
 
 	# Create inset with final dist
 	inset_bounds = [0.65, 0.65, 0.3, 0.3] # inset location, size
