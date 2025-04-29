@@ -22,6 +22,7 @@ import argparse
 # Run just Figure 4b (as in the original example call):
 # python main.py --fig4b
 
+# Note, the seed is preset to 42
 
 def main(args):
 	# Generate figures and data based on parsed arguments.
