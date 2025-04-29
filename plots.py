@@ -630,9 +630,9 @@ def plot_param_variation():
 
 	return k0,k1
 
-def plot_prior():
+def plot_MI():
 	"""
-	Plot the prior over P(y|x) for discrete x=0,1 where P(x)=0.5.
+	Plot the exponentiated MI over P(y|x) for discrete x=0,1 where P(x)=0.5.
 	In this case, there is no volatility function and the prior is just
 	exp(MI) where MI is the mutual information between X and Y. 
 
@@ -715,8 +715,8 @@ def plot_prior():
 
 def plot_random_task(a, b, c, N=100, T=3000, p0=None):
 	"""
-	Run a single associative learning experiment with a random reward schedule.
-	Plot change in distribution over time, with inset showing the final
+	Run a single associative learning experiment with a preference-discouraging
+	reward schedule. Plot change in distribution over time, with inset showing the final
 	learned structure. 
 
 	Params
@@ -742,8 +742,8 @@ def plot_random_task(a, b, c, N=100, T=3000, p0=None):
 	# Generate 2*T samples from the ground truth
 	samples = gen_samples_cond(2*T,truth)
 
-	# Get results from learning with random samples
-	t,ps,msg = get_dist(samples, a, b, c, p0=p0, N=N, T=T)
+	# Get results from learning with preference-discouraging
+	t,ps,msg = get_dist(samples, a, b, c, p0=p0, N=N, T=T, pd=True)
 
 	# average magnitude of derivative of P_t(y|x) over time
 	dp_dt = np.abs(np.diff(ps, axis=0)).mean(axis=(1,2,3))
@@ -753,7 +753,7 @@ def plot_random_task(a, b, c, N=100, T=3000, p0=None):
 	# Plot change in P over time
 	ax.plot(t[1:], dp_dt*10000, 'k', linewidth=3)
 	ax.set_xlabel('Time')
-	ax.set_ylabel(r'Mean $|d\hat P_t/dt|$ ($\times 10^{-4}$)')
+	ax.set_ylabel(r'Update Speed ($\times 10^{-4}$)')
 
 	# Create inset with final dist
 	inset_bounds = [0.65, 0.65, 0.3, 0.3] # inset location, size

@@ -191,7 +191,7 @@ def g2_tilde(p):
 
 	return deriv - deriv_mean
 
-def get_dist(samples, a, b, c, p0=None, N=100, T=1000):
+def get_dist(samples, a, b, c, p0=None, N=100, T=1000, pd=False):
 	"""
 	Compute learning dynamics by integrating first-order ODE
 	equation of motion. Recall, we set delta x = 0 
@@ -213,6 +213,9 @@ def get_dist(samples, a, b, c, p0=None, N=100, T=1000):
 		number of bins in each axis of the internal representation
 	T : float
 		amount of time to run integration
+	pd : bool
+		If true, use a preference-discouraging reward schedule.
+		(P^*(y|x) = 1-hat P(y|x))
 	
 	Returns
 	-------
@@ -234,6 +237,8 @@ def get_dist(samples, a, b, c, p0=None, N=100, T=1000):
 	# Times to save the probabilities
 	t_eval = np.linspace(0, T, T)
 
+	if pd:
+		samples[:,2]=-1 # remove labels
 
 	# Compute time derivative of p
 	def fun(t,p):
@@ -242,7 +247,14 @@ def get_dist(samples, a, b, c, p0=None, N=100, T=1000):
 
 		# current source term
 		m = np.zeros((N,N,2))
-		m[tuple(samples[int(t)])] = 1.
+		sample = samples[int(t)]
+
+		if pd and sample[2] == -1:
+			# set label with a discouraging preference
+			P_y1 = p[tuple(sample[:2])][1]
+			sample[2] = int(rng.uniform() < 1-P_y1)
+
+		m[tuple(sample)] = 1.
 		# summed source for normalization
 		m_x = m.sum(axis=-1, keepdims=True)
 		
