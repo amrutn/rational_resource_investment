@@ -1,0 +1,22 @@
+# environment.yml
+
+name: opt-learning-env # You can change this name
+
+channels:
+  - conda-forge # Often has more up-to-date packages
+  - defaults
+
+dependencies:
+  # --- Python Core ---
+  # Specify a reasonably recent Python version for better compatibility
+  - python=3.9.17
+
+  # --- Numerical Computation ---
+  - numpy=1.24.3
+  - scipy=1.11.4
+
+  # --- Plotting ---
+  - matplotlib=3.7.1
+
+  # --- Progress Bar ---
+  - tqdm=4.65.0
