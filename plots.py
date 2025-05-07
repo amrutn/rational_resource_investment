@@ -633,7 +633,7 @@ def plot_param_variation():
 	axes[2].annotate(label, (0.78,0.4), xycoords='axes fraction', color='blue')
 
 	acc_ax2 = axes[2].twinx()
-	acc_ax2.spines['right'].set_position(('axes', 1.35))
+	acc_ax2.spines['right'].set_position(('axes', 1.4))
 	acc_ax2.set_ylabel('Final Accuracy', color='black')
 	acc_ax2.scatter(c_lst, c_acc[:,-1], c='black', marker='o', alpha=.5)
 	acc_ax2.set_ylim(*acc_ylim)
