@@ -6,6 +6,7 @@ from scipy.special import expit # sigmoid function
 # rng for this code
 rng = np.random.default_rng(42)
 
+
 def gen_dist_cond(sigma, beta, N=100):
 	"""
 	Generate conditional P(y|x) for each grid point, x with varying volatility
@@ -273,10 +274,9 @@ def get_dist(samples, a, b, c, p0=None, N=100, T=1000, pd=False):
 	res = solve_ivp(fun, (0,T), p0, t_eval=t_eval,
 		first_step=.1, rtol=1e-8, atol=1e-8)
 
-	return res['t'], np.moveaxis(res['y'],0,1)[:,:2*N**2].reshape((T,N,N,2)), res['message']
+	return res['t'], np.moveaxis(res['y'],0,1)[:,:2*N**2].reshape((res['t'].size,N,N,2)), res['message']
 
 # Functions for computing with the joint distribution
-
 def create_rectangle_array(N, w, h, high_val, low_val):
     """
     Helper function for generating P(x)
@@ -471,6 +471,14 @@ def compute_d_eff_x(px):
 	p = eig/(eig.sum())
 
 	return np.exp(compute_entropy(p))
+
+# Get exponentially distributed parameters
+def get_exp_params(mean, num):
+	"""
+	Returns an np array of exponentially distributed samples
+	with mean given by mean and number given by num
+	"""
+	return rng.exponential(scale=mean, size=num)
 
 
 

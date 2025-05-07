@@ -95,7 +95,7 @@ def px_vs_constraint(sigma, beta, p_high=0.99, N=100, nsamples=100, collect_data
 
 	combined = np.exp(mis-mean_mi_dev/mean_vol_dev*vols)
 
-	fig,ax = plt.subplots(1,1, figsize=(3,2.1), layout="constrained")
+	fig,ax = plt.subplots(1,1, figsize=(2.5,1.7), layout="constrained")
 	sc = ax.scatter(dimensions, entropies, 
                  c=combined,           
                  cmap='Purples',        # Choose a colormap
@@ -104,14 +104,14 @@ def px_vs_constraint(sigma, beta, p_high=0.99, N=100, nsamples=100, collect_data
                 )
 	cbar = plt.colorbar(sc)
 	cbar.set_label(r'Prior Weight')
-	ax.set_ylabel(r'Measurement Cost: $H[X]$')
-	ax.set_xlabel(r'Cue Distribution Dimension')
+	ax.set_ylabel(r'Cost: $H[X]$')
+	ax.set_xlabel(r'Input Dimension')
 
 	fig.savefig('fig1b.png', format='png', dpi=500)
 
 	return mean_mi_dev/mean_vol_dev
 
-
+# Figure 2b
 def single_plot(a, b, c, sigma, beta, N=100, T=1000, p0=None):
 	"""
 	Run a single associative learning experiment and plot task accuracy over time.
@@ -150,11 +150,11 @@ def single_plot(a, b, c, sigma, beta, N=100, T=1000, p0=None):
 	# probability of correct classification over time
 	accuracy = (truth*ps).sum(axis=-1).mean(axis=(1,2))
 
-	fig = plt.figure(constrained_layout=True, figsize=(3.5,2.1))
+	fig = plt.figure(constrained_layout=True, figsize=(2.9,1.7))
 	axs = fig.subplot_mosaic([['Left', 'TopRight'],['Left', 'BottomRight']],
                           gridspec_kw={'width_ratios':[2, 1]})
 	ax_res = axs['Left']
-	ax_res.plot(t, accuracy, 'k', linewidth=6)
+	ax_res.plot(t, accuracy, 'k')
 	ax_res.set_ylim(top=1.0)
 	ax_res.set_xlabel('Time')
 	ax_res.set_ylabel('Accuracy')
@@ -172,7 +172,7 @@ def single_plot(a, b, c, sigma, beta, N=100, T=1000, p0=None):
 	fig.savefig('fig2b.png', format='png', dpi=500)
 
 
-def collect_data_param_variation(a_lst, b_lst, c_lst, sigma_lst, beta_lst, N=100, T=3000):
+def collect_data_param_variation(a_lst, b_lst, c_lst, sigma_lst, beta_lst, num=30, N=100, T=3000):
 	"""
 	Compute how varying equation of motion, and task parameters changes transition time,
 	abruptness and final accuracy. Compare to the analytically derived scaling laws.
@@ -192,6 +192,8 @@ def collect_data_param_variation(a_lst, b_lst, c_lst, sigma_lst, beta_lst, N=100
 		Array of sigma values to test, controlling task smoothness. 0th element is anchor.
 	beta_lst : np array
 		Array of beta values to test, controlling task uncertainty. 0th element is anchor.
+	num : int
+		Number of random simulations to do
 	N : int
 		number of bins in each x axis
 	T : float
@@ -281,13 +283,15 @@ def collect_data_param_variation(a_lst, b_lst, c_lst, sigma_lst, beta_lst, N=100
 	c = c_lst[0]
 	sigma = sigma_lst[0]
 	beta = beta_lst[0]
-	
+
 	# Compute a variations
 	latency_vary_a = []
 	abruptness_vary_a = []
 	acc_vary_a = []
 
 	# iterate through a_lst
+	print("Collecting a Parameter Variations")
+
 	for a_iter in tqdm(a_lst):
 		# Generate true distribution
 		truth = gen_dist_cond(sigma, beta, N=N)
@@ -313,6 +317,8 @@ def collect_data_param_variation(a_lst, b_lst, c_lst, sigma_lst, beta_lst, N=100
 	np.save("param_vary_data/a_lst", a_lst)
 
 	# Compute b variations
+	print("Collecting b Parameter Variations")
+
 	latency_vary_b = []
 	abruptness_vary_b = []
 	acc_vary_b = []
@@ -343,6 +349,8 @@ def collect_data_param_variation(a_lst, b_lst, c_lst, sigma_lst, beta_lst, N=100
 	np.save("param_vary_data/b_lst", b_lst)
 	
 	# Compute c variations
+	print("Collecting c Parameter Variations")
+
 	latency_vary_c = []
 	abruptness_vary_c = []
 	acc_vary_c = []
@@ -374,6 +382,8 @@ def collect_data_param_variation(a_lst, b_lst, c_lst, sigma_lst, beta_lst, N=100
 
 
 	# Compute sigma variations
+	print("Collecting Sigma Parameter Variations")
+
 	latency_vary_sigma = []
 	abruptness_vary_sigma = []
 	acc_vary_sigma = []
@@ -405,6 +415,8 @@ def collect_data_param_variation(a_lst, b_lst, c_lst, sigma_lst, beta_lst, N=100
 	
 
 	# Compute beta variations
+	print("Collecting Beta Parameter Variations")
+
 	latency_vary_beta = []
 	abruptness_vary_beta = []
 	acc_vary_beta = []
@@ -433,6 +445,44 @@ def collect_data_param_variation(a_lst, b_lst, c_lst, sigma_lst, beta_lst, N=100
 	np.save("param_vary_data/abruptness_vary_beta", abruptness_vary_beta)
 	np.save("param_vary_data/acc_vary_beta", acc_vary_beta)
 	np.save("param_vary_data/beta_lst", beta_lst)
+	
+	# Collect data for random parameter variations
+	print("Collecting Random Parameter Variations")
+	# Compute mean lambda_r_T, lambda_1, lambda_2
+	lambda_r_T_mean = N**2/a
+	lambda_1_mean = c * lambda_r_T_mean
+	lambda_2_mean = b/2 * lambda_r_T_mean
+
+	# Sample 25 random parameters from an exponential distribution
+	lambda_r_Ts = get_exp_params(lambda_r_T_mean, num)
+	lambda_1s = get_exp_params(lambda_1_mean, num)
+	lambda_2s = get_exp_params(lambda_2_mean, num)
+
+	# True distribution and samples
+	truth = gen_dist_cond(sigma, beta, N=N)
+	samples = gen_samples_cond(2*T,truth)
+
+	# Run simulations with the parameter combinations
+	latency_random = []
+	abruptness_random = []
+	for i in tqdm(range(num)):
+		tmp_a = N**2/lambda_r_Ts[i]
+		tmp_b = 2*lambda_2s[i]/lambda_r_Ts[i]
+		tmp_c = lambda_1s[i]/lambda_r_Ts[i]
+
+		# Get results
+		t,ps,msg = get_dist(samples, tmp_a, tmp_b, tmp_c, N=N, T=T)
+
+		# compute accuracy, latency, abruptness
+		accuracy = (truth*ps).sum(axis=-1).mean(axis=(1,2))
+		if accuracy[-1] > 0.75: # only include data which transitioned
+			latency_random.append(compute_latency(ps))
+			abruptness_random.append(compute_abruptness(ps))
+
+	# save results
+	np.save("param_vary_data/latency_random", latency_random)
+	np.save("param_vary_data/abruptness_random", abruptness_random)
+
 
 def plot_param_variation():
 	"""
@@ -450,10 +500,10 @@ def plot_param_variation():
 
 	# First plot the a,b,c variation figure.
 
-	fig,axes = plt.subplots(1,3, figsize=(6.5,2.1), layout="constrained")
+	fig,axes = plt.subplots(1,3, figsize=(5.4,1.7), layout="constrained")
 	scale_rates=1000
 	rates_ylim = (0.002, 0.015)
-	times_ylim = (400,2500)
+	times_ylim = (.4,2.5)
 	acc_ylim = (0.5,1.0)
 
 	# define fitting functions
@@ -476,6 +526,13 @@ def plot_param_variation():
 		"""
 		return -np.log(k0*a_lst[0])/c_iter
 
+	def f3(rho,k0,k1):
+		"""
+		tau vs rho
+		"""
+		return -np.log(k0*a_lst[0]) * k1 * rho**(-1)
+
+	# Load all the data
 	a_lst = np.load("param_vary_data/a_lst.npy")
 	b_lst = np.load("param_vary_data/b_lst.npy")
 	c_lst = np.load("param_vary_data/c_lst.npy")
@@ -502,6 +559,9 @@ def plot_param_variation():
 	latencies_beta = np.load("param_vary_data/latency_vary_beta.npy")
 	beta_acc = np.load("param_vary_data/acc_vary_beta.npy")
 
+	abruptness_random = np.load("param_vary_data/abruptness_random.npy")
+	latencies_random = np.load("param_vary_data/latency_random.npy")
+
 	# fit to latencies
 	k0 = curve_fit(f0, a_lst, latencies_a, p0=.01)[0][0]
 	fitted_curve_f0 = f0(a_lst, k0)
@@ -509,12 +569,13 @@ def plot_param_variation():
 	# Plot latency, abruptness, final accuracy vs a
 	axes[0].set_xlabel(r"Data Source ($a$)")
 	axes[0].set_xscale('log')
-	axes[0].set_ylabel('Latency', color='red')
-	axes[0].scatter(a_lst, latencies_a, c='red', marker='o', alpha=.5)
+	axes[0].set_ylabel(r'Latency ($\times 10^3$)', color='red')
+	axes[0].tick_params(axis='y', colors='red')
+	axes[0].scatter(a_lst, latencies_a/10**3, c='red', marker='o', alpha=.5)
 	label = r'$-\frac{1}{c}\log(k_0a)$'
-	axes[0].plot(a_lst[1:], fitted_curve_f0[1:], 'r-', label=label)
+	axes[0].plot(a_lst[1:], fitted_curve_f0[1:]/10**3, 'r-', label=label)
 	axes[0].set_ylim(*times_ylim)
-	axes[0].annotate(label, (.27,.15), xycoords='axes fraction', color='red')
+	axes[0].annotate(label, (.20,.1), xycoords='axes fraction', color='red')
 
 	twin_ax0 = axes[0].twinx()
 	twin_ax0.scatter(a_lst, abruptness_a, c='blue', marker='o', alpha=.5)
@@ -528,10 +589,10 @@ def plot_param_variation():
 
 
 	# Plot transition rates and times vs b
-	axes[1].set_xlabel(r'Smoothness ($b$)')
+	axes[1].set_xlabel(r'Regularity ($b$)')
 	axes[1].set_xscale('log')
 	axes[1].set_yticks([])
-	axes[1].scatter(b_lst, latencies_b, c='red', marker='o', alpha=.5)
+	axes[1].scatter(b_lst, latencies_b/10**3, c='red', marker='o', alpha=.5)
 	axes[1].set_ylim(*times_ylim)
 
 	twin_ax1 = axes[1].twinx()
@@ -553,24 +614,23 @@ def plot_param_variation():
 	fitted_curve_f1 = f1(c_lst, k1)
 
 	# Plot abruptness and latencies vs c
-	axes[2].set_xlabel(r'Predictivity ($c$)')
+	axes[2].set_xlabel(r'Dependence ($c$)')
 	axes[2].set_yticks([])
-	axes[2].scatter(c_lst, latencies_c, c='red', marker='o', alpha=.5)
-	label = r'$-\frac{1}{c}\log (k_0 a)$'
-	axes[2].plot(c_lst[1:], fitted_curve_f2[1:], 'r-', label=label)
+	axes[2].scatter(c_lst, latencies_c/10**3, c='red', marker='o', alpha=.5)
+	axes[2].plot(c_lst[1:], fitted_curve_f2[1:]/10**3, 'r-', label=label)
 	axes[2].set_ylim(*times_ylim)
-	axes[2].annotate(label, (0.34,0.07), xycoords='axes fraction', color='red', rotation=0)
 
 	twin_ax2 = axes[2].twinx()
 	twin_ax2.set_ylabel(r'Abruptness ($\times 10^{-3}$)', color='blue')
 	twin_ax2.scatter(c_lst, abruptness_c, c='blue', marker='o', alpha=.5)
+	twin_ax2.tick_params(axis='y', colors='blue')
 	label = r'$k_1c$'
 	twin_ax2.plot(c_lst[1:], fitted_curve_f1[1:], 'b-', label=label)
 	twin_ax2.set_ylim(*rates_ylim)
 	# rescale abruptness so that it looks nicer
 	ticks_y = mpl.ticker.FuncFormatter(lambda x, pos: '{0:g}'.format(x*scale_rates))
 	twin_ax2.yaxis.set_major_formatter(ticks_y)
-	axes[2].annotate(label, (0.78,0.5), xycoords='axes fraction', color='blue')
+	axes[2].annotate(label, (0.78,0.4), xycoords='axes fraction', color='blue')
 
 	acc_ax2 = axes[2].twinx()
 	acc_ax2.spines['right'].set_position(('axes', 1.35))
@@ -583,13 +643,14 @@ def plot_param_variation():
 	fig.savefig("fig3a.png", format='png', dpi=500)
 
 	# create figure for task variation
-	fig_task,axes_task = plt.subplots(1,2, figsize=(5.0,2.1), layout="constrained")
+	fig_task,axes_task = plt.subplots(1,2, figsize=(3.7,1.7), layout="constrained")
 
 
 	# Plot latency, abruptness, final accuracy vs sigma
-	axes_task[0].set_xlabel(r'Task Smoothness ($\sigma$)')
-	axes_task[0].set_ylabel('Latency', color='red')
-	axes_task[0].scatter(sigma_lst, latencies_sigma, c='red', marker='o', alpha=.5)
+	axes_task[0].set_xlabel(r'Smoothness ($\sigma$)')
+	axes_task[0].set_ylabel(r'Latency ($\times 10^3$)', color='red')
+	axes_task[0].tick_params(axis='y', colors='red')
+	axes_task[0].scatter(sigma_lst, latencies_sigma/10**3, c='red', marker='o', alpha=.5)
 	axes_task[0].set_ylim(*times_ylim)
 
 	twin_ax0 = axes_task[0].twinx()
@@ -604,22 +665,23 @@ def plot_param_variation():
 
 
 	# Plot abruptness, latency and accuracy vs beta
-	axes_task[1].set_xlabel(r'Task Certainty ($\beta$)')
+	axes_task[1].set_xlabel(r'Certainty ($\beta$)')
 	axes_task[1].set_xscale('log')
 	axes_task[1].set_yticks([])
-	axes_task[1].scatter(beta_lst, latencies_beta, c='red', marker='o', alpha=.5)
+	axes_task[1].scatter(beta_lst, latencies_beta/10**3, c='red', marker='o', alpha=.5)
 	axes_task[1].set_ylim(*times_ylim)
 
 	twin_ax1 = axes_task[1].twinx()
 	twin_ax1.set_ylabel(r'Abruptness ($\times 10^{-3}$)', color='blue')
 	twin_ax1.scatter(beta_lst, abruptness_beta, c='blue', marker='o', alpha=.5)
+	twin_ax1.tick_params(axis='y', colors='blue')
 	twin_ax1.set_ylim(*rates_ylim)
 	# rescale abruptness so that it looks nicer
 	ticks_y = mpl.ticker.FuncFormatter(lambda x, pos: '{0:g}'.format(x*scale_rates))
 	twin_ax1.yaxis.set_major_formatter(ticks_y)
 
 	acc_ax1 = axes_task[1].twinx()
-	acc_ax1.spines['right'].set_position(('axes', 1.35))
+	acc_ax1.spines['right'].set_position(('axes', 1.4))
 	acc_ax1.set_ylabel('Final Accuracy', color='black')
 	acc_ax1.scatter(beta_lst, beta_acc[:,-1], c='black', marker='o', alpha=.5)
 	acc_ax1.set_ylim(*acc_ylim)
@@ -627,6 +689,20 @@ def plot_param_variation():
 
 	# save figure
 	fig_task.savefig("fig3b.png", format='png', dpi=500)
+
+	# fitted curve latency vs abruptness (Figure 3c)
+	fit_curve_f3 = f3(np.sort(abruptness_random), k0, k1)
+
+	# Make plot
+	fig_rand, ax_rand = plt.subplots(figsize=(1.7, 1.7), layout="constrained")
+
+	ax_rand.set_xlabel(r'Abruptness')
+	ax_rand.set_ylabel(r'Latency ($\times 10^3$)')
+	ax_rand.scatter(abruptness_random, latencies_random/10**3, c='green', marker='o', alpha=.5)
+	ax_rand.plot(np.sort(abruptness_random), fit_curve_f3/10**3, 'g-')
+	ax_rand.annotate(r"$\tau\propto \rho^{-1}$", (.3,.3), xycoords='axes fraction', c='green')
+
+	fig_rand.savefig('fig3c.png', format='png', dpi=500)
 
 	return k0,k1
 
@@ -676,7 +752,7 @@ def plot_MI():
 
 	# Compute V, plot
 	V_grid = V(P0, P1)
-	fig, ax = plt.subplots(figsize=(2.75,2.1), layout="constrained")
+	fig, ax = plt.subplots(figsize=(2.2,1.7), layout="constrained")
 
 	# Define custom colormap
 	cmap_white_red = mcolors.LinearSegmentedColormap.from_list("white_red", ["white", "red"])
@@ -748,17 +824,17 @@ def plot_random_task(a, b, c, N=100, T=3000, p0=None):
 	# average magnitude of derivative of P_t(y|x) over time
 	dp_dt = np.abs(np.diff(ps, axis=0)).mean(axis=(1,2,3))
 
-	fig, ax = plt.subplots(figsize=(3.25,2.1), layout="constrained")
+	fig, ax = plt.subplots(figsize=(2.7,1.7), layout="constrained")
 	
 	# Plot change in P over time
-	ax.plot(t[1:], dp_dt*10000, 'k', linewidth=3)
+	ax.plot(t[1:], dp_dt*10000, 'k')
 	ax.set_xlabel('Time')
 	ax.set_ylabel(r'Update Speed ($\times 10^{-4}$)')
 
 	# Create inset with final dist
 	inset_bounds = [0.65, 0.65, 0.3, 0.3] # inset location, size
 	axins = ax.inset_axes(inset_bounds)
-	axins.annotate(r"$\hat P_{T}(1|x)$", (-0.15,-0.35), xycoords='axes fraction')
+	axins.annotate(r"$P_T$", (-0.15,-0.35), xycoords='axes fraction')
 
 	# show final output
 	axins.imshow(ps[-1,:,:,1], cmap='coolwarm', vmin=0, vmax=1, origin='lower')
@@ -803,7 +879,7 @@ def plot_random_task(a, b, c, N=100, T=3000, p0=None):
 	# Make second inset
 	inset_bounds2 = [0.4, 0.3, 0.3, 0.3] # inset location, size
 	axins2= ax.inset_axes(inset_bounds2)
-	axins2.annotate(r"$\hat P_{.75T}(1|x)$", (-0.15,-0.35), xycoords='axes fraction')
+	axins2.annotate(r"$P_{.75T}$", (-0.15,-0.35), xycoords='axes fraction')
 
 
 	# Draw connecting lines for inset
