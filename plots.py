@@ -575,7 +575,7 @@ def plot_param_variation():
 	label = r'$-\frac{1}{c}\log(k_0a)$'
 	axes[0].plot(a_lst[1:], fitted_curve_f0[1:]/10**3, 'r-', label=label)
 	axes[0].set_ylim(*times_ylim)
-	axes[0].annotate(label, (.20,.1), xycoords='axes fraction', color='red')
+	axes[0].annotate(label, (.17,.1), xycoords='axes fraction', color='red')
 
 	twin_ax0 = axes[0].twinx()
 	twin_ax0.scatter(a_lst, abruptness_a, c='blue', marker='o', alpha=.5)
