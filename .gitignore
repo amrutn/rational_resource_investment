@@ -2,6 +2,7 @@
 *.npy
 *.npz
 *.png
+*.pdf
 param_vary_data/
 px_data/
 

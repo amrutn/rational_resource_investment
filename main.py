@@ -61,8 +61,8 @@ def main(args):
 		b_lst = np.exp(np.linspace(np.log(.0001),np.log(1.5),25))
 		b_lst = np.insert(b_lst, 0, .01)
 
-		# c varies from 0.0075 to 0.025, anchor 0.01
-		c_lst = np.linspace(.001,0.02,20)
+		# c varies from 0.0075 to 0.02, anchor 0.01
+		c_lst = np.linspace(.0075,0.02,20)
 		c_lst = np.insert(c_lst, 0, .01)
 
 		# sigma varies from 1 to 25, anchor 20
@@ -82,10 +82,14 @@ def main(args):
 	if args.fig3:
 		print("Generating Figure 3 (requires collected parameter data).")
 		try:
-			k0, k1 = plot_param_variation()
+			k0, k1,r_square_f0,r_square_f1,r_square_f2, r_square_f3 = plot_param_variation()
 			print('Fit Results:')
 			print(r'k0 = {:.5e}'.format(k0))
 			print('k1 = {:.5}'.format(k1))
+			print(r'$R^2$ latencies vary $a$ = {:.5}'.format(r_square_f0))
+			print(r'$R^2$ abruptness vary $c$ = {:.5}'.format(r_square_f1))
+			print(r'$R^2$ latencies vary $c$ = {:.5}'.format(r_square_f2))
+			print(r'$R^2$ latencies vs abruptness = {:.5}'.format(r_square_f3))
 		except FileNotFoundError:
 			print("Error: Parameter variation data file not found. Run with --collect-param-data first.")
 		except Exception as e:
