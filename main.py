@@ -27,32 +27,32 @@ import argparse
 def main(args):
 	# Generate figures and data based on parsed arguments.
 
-	if args.fig1b:
+	if args.fig2b:
 		# Generate sloppiness experiment figure, collect data if necessary.
 		if args.collect_data_sloppy:
-			print("Generating Figure 1b and collecting data.")
+			print("Generating Figure 2b and collecting data.")
 			scale = px_vs_constraint(sigma=30, beta=50, p_high=1.0, N=100, nsamples=1000, collect_data=True)
 			print(r"Volatility Scale ($k$): {}".format(scale))
 		else:
-			print("Generating Figure 1b, using pre-collected data.")
+			print("Generating Figure 2b, using pre-collected data.")
 			try:
 				scale = px_vs_constraint(sigma=30, beta=50, p_high=1.0, N=100, nsamples=1000, collect_data=False)
 				print(r"Volatility Scale ($k$): {}".format(scale))
 			except FileNotFoundError:
-				print("Error: Data not found for Figure 1b. Run with --collect-data-sloppy first.")
+				print("Error: Data not found for Figure 2b. Run with --collect-data-sloppy first.")
 			except Exception as e:
-				print(f"An error occurred generating Figure 1b: {e}")
+				print(f"An error occurred generating Figure 2b: {e}")
 
-	if args.fig2b:
-		print("Generating Figure 2b.")
+	if args.fig3b:
+		print("Generating Figure 3b.")
 		try:
 			single_plot(a=0.001, b=0.01, c=0.01, sigma=20,beta=50,N=100, T=2000)
 		except Exception as e:
-			print(f"An error occurred generating Figure 2b: {e}")
+			print(f"An error occurred generating Figure 3b: {e}")
 
 	# collect parameter variation data
 	if args.collect_param_data:
-		print("Collecting data for parameter variation (Figure 3).")
+		print("Collecting data for parameter variation (Figure 3 and 4).")
 		# a varies from .00001 to .1, anchor .001
 		a_lst = np.exp(np.linspace(np.log(.00001),np.log(.1),25))
 		a_lst = np.insert(a_lst, 0, .001)
@@ -78,9 +78,9 @@ def main(args):
 		except Exception as e:
 			print(f"An error occurred during parameter variation data collection: {e}")
 
-	# Generating Figure 3, requires parameter variation data
-	if args.fig3:
-		print("Generating Figure 3 (requires collected parameter data).")
+	# Generating Figure 4 and 6, requires parameter variation data
+	if args.fig4_6
+		print("Generating Figures 4 and 6 (requires collected parameter data).")
 		try:
 			k0, k1,r_square_f0,r_square_f1,r_square_f2, r_square_f3 = plot_param_variation()
 			print('Fit Results:')
@@ -93,24 +93,41 @@ def main(args):
 		except FileNotFoundError:
 			print("Error: Parameter variation data file not found. Run with --collect-param-data first.")
 		except Exception as e:
-			print(f"An error occurred generating Figure 3: {e}")
+			print(f"An error occurred generating Figures 4 and 6: {e}")
 
-	# Generating Figure 4a: plot exponentiated MI
-	if args.fig4a:
-		print("Generating Figure 4a")
+	if args.fig5:
+		print("Generating synthetic replica of Gallistel's plot, Figure 5")
+		try:
+			plot_random_curves()
+		except FileNotFoundError:
+			print("Error: Random parameter variation data file not found. Run with --collect-param-data first.")
+		except Exception as e:
+			print(f"An error occurred generating synthetic Gallistel replica: {e}")
+
+	# Generating Figure 5a: plot exponentiated MI
+	if args.fig7a:
+		print("Generating Figure 7a")
 		try:
 			plot_MI()
 		except Exception as e:
-			print(f"An error occurred generating Figure 4a: {e}")
+			print(f"An error occurred generating Figure 7a: {e}")
 
-	# Generating Figure 4b: plot dp/dt with discouraging reward schedule
-	if args.fig4b:
-		print("Generating Figure 4b")
+	# Generating Figure 5b and 5c: plot dp/dt with uniform and discouraging reward schedule
+	if args.fig7bc:
+		print("Generating Figure 7b")
 		try:
-			delta_p = plot_random_task(a=0.001, b=0.01, c=0.01, N=100, T=4000)
+			delta_p = plot_random_task(a=0.001, b=0.01, c=0.01, N=100, T=4000, discourage=False)
 			print(r'Average $|\Delta \hat P|$ from .75 completed to end is {}'.format(delta_p))
 		except Exception as e:
-			print(f"An error occurred generating Figure 4b: {e}")
+			print(f"An error occurred generating Figure 7b: {e}")
+
+		print("Generating Figure 7c")
+		try:
+			delta_p = plot_random_task(a=0.001, b=0.01, c=0.01, N=100, T=4000, discourage=True)
+			print(r'Average $|\Delta \hat P|$ from .75 completed to end is {}'.format(delta_p))
+		except Exception as e:
+			print(f"An error occurred generating Figure 7c: {e}")
+
 
 	print("Script Finished")
 	return
@@ -119,16 +136,18 @@ if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description="Generate figures and collect data for the paper.")
 
 	# Flags to enable figure generation (default is False)
-	parser.add_argument('--fig1b', action='store_true', 
-    	help='Generate Figure 1b (Sloppiness/Prior Weight). Requires --collect-data-sloppy first if data is not present.')
 	parser.add_argument('--fig2b', action='store_true', 
-    	help='Generate Figure 2b (Simple Learning Curve).')
-	parser.add_argument('--fig3', action='store_true', 
-    	help='Generate Figure 3 (Parameter Variation Scaling). Requires --collect-param-data first if data is not present.')
-	parser.add_argument('--fig4a', action='store_true', 
-    	help='Generate Figure 4a (Exponentiated Mutual Information).')
-	parser.add_argument('--fig4b', action='store_true', 
-    	help='Generate Figure 4b (Persistence/Random Task).')
+    	help='Generate Figure 2b (Sloppiness/Prior Weight). Requires --collect-data-sloppy first if data is not present.')
+	parser.add_argument('--fig3b', action='store_true', 
+    	help='Generate Figure 3b (Simple Learning Curve).')
+	parser.add_argument('--fig4-6', action='store_true', 
+    	help='Generate Figure 4 and 6 (Parameter Variation Scaling). Requires --collect-param-data first if data is not present.')
+	parser.add_argument('--fig5', action='store_true', 
+    	help='Generate Figure 5. Requires --collect-param-data first if data is not present.')
+	parser.add_argument('--fig7a', action='store_true', 
+    	help='Generate Figure 7a (Exponentiated Mutual Information).')
+	parser.add_argument('--fig7bc', action='store_true', 
+    	help='Generate Figure 7b and 7c (Persistence/Random Task).')
 
 	# Flags to enable data collection (default is False)
 	parser.add_argument('--collect-param-data', action='store_true', 
@@ -143,11 +162,12 @@ if __name__ == "__main__":
 
 	# If --all is specified, set all flags to True
 	if args.all:
-		args.fig1b = True
 		args.fig2b = True
-		args.fig3 = True
-		args.fig4a = True
-		args.fig4b = True
+		args.fig3b = True
+		args.fig4_6 = True
+		args.fig5 = True
+		args.fig7a = True
+		args.fig7bc = True
 		args.collect_param_data = True
 		args.collect_data_sloppy = True
 

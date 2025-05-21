@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import ConnectionPatch
 import matplotlib.colors as mcolors
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import matplotlib as mpl
 from scipy.optimize import curve_fit
 from pathlib import Path
@@ -107,7 +108,7 @@ def px_vs_constraint(sigma, beta, p_high=0.99, N=100, nsamples=100, collect_data
 	ax.set_ylabel(r'Cost: $H[x]$')
 	ax.set_xlabel(r'Effective Dimensionality')
 
-	fig.savefig('fig1b.pdf', format='pdf', dpi=500)
+	fig.savefig('fig2b.pdf', format='pdf', dpi=500)
 
 	return mean_mi_dev/mean_vol_dev
 
@@ -169,7 +170,7 @@ def single_plot(a, b, c, sigma, beta, N=100, T=1000, p0=None):
 	axs['BottomRight'].set_xticks([])
 	axs['BottomRight'].set_yticks([])
 
-	fig.savefig('fig2b.pdf', format='pdf', dpi=500)
+	fig.savefig('fig3b.pdf', format='pdf', dpi=500)
 
 
 def collect_data_param_variation(a_lst, b_lst, c_lst, sigma_lst, beta_lst, num=30, N=100, T=3000):
@@ -283,7 +284,7 @@ def collect_data_param_variation(a_lst, b_lst, c_lst, sigma_lst, beta_lst, num=3
 	c = c_lst[0]
 	sigma = sigma_lst[0]
 	beta = beta_lst[0]
-
+	
 	# Compute a variations
 	latency_vary_a = []
 	abruptness_vary_a = []
@@ -379,7 +380,7 @@ def collect_data_param_variation(a_lst, b_lst, c_lst, sigma_lst, beta_lst, num=3
 	np.save("param_vary_data/abruptness_vary_c", abruptness_vary_c)
 	np.save("param_vary_data/acc_vary_c", acc_vary_c)
 	np.save("param_vary_data/c_lst", c_lst)
-
+	
 
 	# Compute sigma variations
 	print("Collecting Sigma Parameter Variations")
@@ -387,8 +388,9 @@ def collect_data_param_variation(a_lst, b_lst, c_lst, sigma_lst, beta_lst, num=3
 	latency_vary_sigma = []
 	abruptness_vary_sigma = []
 	acc_vary_sigma = []
+	g_1_lst = []
 
-	# iterate through a_lst
+	# iterate through sigma_lst
 	for sigma_iter in tqdm(sigma_lst):
 		# Generate true distribution
 		truth = gen_dist_cond(sigma_iter, beta, N=N)
@@ -406,12 +408,14 @@ def collect_data_param_variation(a_lst, b_lst, c_lst, sigma_lst, beta_lst, num=3
 		latency_vary_sigma.append(latency)
 		abruptness_vary_sigma.append(abruptness)
 		acc_vary_sigma.append(accuracy)
+		g_1_lst.append(-compute_vol_joint(1/N**2 * np.ones((N,N,1)), truth))
 
 	# save results
 	np.save("param_vary_data/latency_vary_sigma", latency_vary_sigma)
 	np.save("param_vary_data/abruptness_vary_sigma", abruptness_vary_sigma)
 	np.save("param_vary_data/acc_vary_sigma", acc_vary_sigma)
 	np.save("param_vary_data/sigma_lst", sigma_lst)
+	np.save("param_vary_data/g_1_lst", g_1_lst)
 	
 
 	# Compute beta variations
@@ -420,8 +424,9 @@ def collect_data_param_variation(a_lst, b_lst, c_lst, sigma_lst, beta_lst, num=3
 	latency_vary_beta = []
 	abruptness_vary_beta = []
 	acc_vary_beta = []
+	g_2_lst = []
 
-	# iterate through a_lst
+	# iterate through beta_lst
 	for beta_iter in tqdm(beta_lst):
 		# Generate true distribution
 		truth = gen_dist_cond(sigma, beta_iter, N=N)
@@ -439,12 +444,14 @@ def collect_data_param_variation(a_lst, b_lst, c_lst, sigma_lst, beta_lst, num=3
 		latency_vary_beta.append(latency)
 		abruptness_vary_beta.append(abruptness)
 		acc_vary_beta.append(accuracy)
+		g_2_lst.append(compute_mi_joint(1/N**2 * np.ones((N,N,1)), truth))
 
 	# save results
 	np.save("param_vary_data/latency_vary_beta", latency_vary_beta)
 	np.save("param_vary_data/abruptness_vary_beta", abruptness_vary_beta)
 	np.save("param_vary_data/acc_vary_beta", acc_vary_beta)
 	np.save("param_vary_data/beta_lst", beta_lst)
+	np.save("param_vary_data/g_2_lst", g_2_lst)
 	
 	# Collect data for random parameter variations
 	print("Collecting Random Parameter Variations")
@@ -452,7 +459,7 @@ def collect_data_param_variation(a_lst, b_lst, c_lst, sigma_lst, beta_lst, num=3
 	landa_eta_mean = N**2/a
 	lambda_1_mean = c * landa_eta_mean
 	lambda_2_mean = b/2 * landa_eta_mean
-
+	
 	# Sample 25 random parameters from an exponential distribution
 	landa_etas = get_exp_params(landa_eta_mean, num)
 	lambda_1s = get_exp_params(lambda_1_mean, num)
@@ -465,6 +472,7 @@ def collect_data_param_variation(a_lst, b_lst, c_lst, sigma_lst, beta_lst, num=3
 	# Run simulations with the parameter combinations
 	latency_random = []
 	abruptness_random = []
+	accuracies_random = []
 	for i in tqdm(range(num)):
 		tmp_a = N**2/landa_etas[i]
 		tmp_b = 2*lambda_2s[i]/landa_etas[i]
@@ -478,11 +486,37 @@ def collect_data_param_variation(a_lst, b_lst, c_lst, sigma_lst, beta_lst, num=3
 		if accuracy[-1] > 0.75: # only include data which transitioned
 			latency_random.append(compute_latency(ps))
 			abruptness_random.append(compute_abruptness(ps))
+		if accuracy.size == int(T):
+			accuracies_random.append(accuracy)
 
 	# save results
 	np.save("param_vary_data/latency_random", latency_random)
 	np.save("param_vary_data/abruptness_random", abruptness_random)
+	np.save("param_vary_data/accuracies_random", accuracies_random)
+	
+def plot_random_curves():
+	"""
+	Plot learning curves with exponentially distributed parameters
+	and mean curve, to compare with Gallistel's figure.
+	"""
+	accuracies = np.load("param_vary_data/accuracies_random.npy", allow_pickle=True)
+	mean_curve = accuracies.mean(axis=0)
 
+	fig,ax=plt.subplots(figsize=(2.1,1.7), layout="constrained")
+	for i in range(10):
+		T = accuracies[i].size
+		if i ==0:
+			ax.plot(range(T),accuracies[i], 'k', alpha=.4, label='Individual')
+		else:
+			ax.plot(range(T),accuracies[i], 'k', alpha=.4)
+
+	ax.plot(range(T), mean_curve, 'k', linewidth=3, label='Averaged')
+	ax.set_ylim(top=1)
+	ax.set_ylabel("Accuracy")
+	ax.set_xlabel("Time")
+	# save figure
+	fig.savefig("fig5.pdf", format='pdf', dpi=500)
+	return
 
 def plot_param_variation():
 	"""
@@ -497,7 +531,6 @@ def plot_param_variation():
 	The data paths are automatically chosen as the output paths in the 
 	collect_data_param_variation function. 
 	"""
-
 	# First plot the a,b,c variation figure.
 
 	fig,axes = plt.subplots(1,3, figsize=(5.4,1.7), layout="constrained")
@@ -538,6 +571,8 @@ def plot_param_variation():
 	c_lst = np.load("param_vary_data/c_lst.npy")
 	sigma_lst = np.load("param_vary_data/sigma_lst.npy")
 	beta_lst = np.load("param_vary_data/beta_lst.npy")
+	g_1_lst = np.load("param_vary_data/g_1_lst.npy")
+	g_2_lst = np.load("param_vary_data/g_2_lst.npy")
 
 	abruptness_a = np.load("param_vary_data/abruptness_vary_a.npy")
 	latencies_a = np.load("param_vary_data/latency_vary_a.npy")
@@ -598,17 +633,22 @@ def plot_param_variation():
 	axes[1].set_yticks([])
 	axes[1].scatter(b_lst, latencies_b/10**3, c='red', marker='o', alpha=.5, s=15)
 	axes[1].set_ylim(*times_ylim)
+	argmin_lat = b_lst[np.argmin(latencies_b)]
+	axes[1].vlines(argmin_lat, ymin=0, ymax=(latencies_b/10**3).min(), alpha=.4, colors='r', linestyles='--', linewidth=.5)
 
 	twin_ax1 = axes[1].twinx()
 	twin_ax1.set_yticks([])
 	twin_ax1.scatter(b_lst, abruptness_b, c='blue', marker='o', alpha=.5, s=15)
 	twin_ax1.set_ylim(*rates_ylim)
+	argmax_abrupt = b_lst[np.argmax(abruptness_b)]
+	twin_ax1.vlines(argmax_abrupt, ymin=0, ymax=abruptness_b.max(), alpha=.4, colors='b', linestyles='--', linewidth=.5)
 
 	acc_ax1 = axes[1].twinx()
 	acc_ax1.set_yticks([])
 	acc_ax1.scatter(b_lst, b_acc[:,-1], c='black', marker='o', alpha=.5, s=15)
 	acc_ax1.set_ylim(*acc_ylim)
-
+	argmax_acc = b_lst[np.argmax(b_acc[:,-1])]
+	twin_ax1.vlines(argmax_acc, ymin=0, ymax=b_acc[:,-1].max(), alpha=.4, colors='k', linestyles='--', linewidth=.5)
 
 	# Compute fitted curve using the fitted parameter from a
 	fitted_curve_f2 = f2(c_lst, k0)
@@ -654,40 +694,38 @@ def plot_param_variation():
 
 
 	# save figure
-	fig.savefig("fig3a.pdf", format='pdf', dpi=500)
+	fig.savefig("fig4a.pdf", format='pdf', dpi=500)
 
 	# create figure for task variation
 	fig_task,axes_task = plt.subplots(1,2, figsize=(3.7,1.7), layout="constrained")
 
 
 	# Plot latency, abruptness, final accuracy vs sigma
-	axes_task[0].set_xlabel(r'Smoothness ($\sigma$)')
+	axes_task[0].set_xlabel(r'$\exp(g_1[P^*])$')
 	axes_task[0].set_ylabel(r'Latency ($\times 10^3$)', color='red')
 	axes_task[0].tick_params(axis='y', colors='red')
-	axes_task[0].scatter(sigma_lst, latencies_sigma/10**3, c='red', marker='o', alpha=.5, s=15)
+	axes_task[0].scatter(np.exp(g_1_lst), latencies_sigma/10**3, c='red', marker='o', alpha=.5, s=15)
 	axes_task[0].set_ylim(*times_ylim)
 
 	twin_ax0 = axes_task[0].twinx()
-	twin_ax0.scatter(sigma_lst, abruptness_sigma, c='blue', marker='o', alpha=.5, s=15)
+	twin_ax0.scatter(np.exp(g_1_lst), abruptness_sigma, c='blue', marker='o', alpha=.5, s=15)
 	twin_ax0.set_yticks([])
 	twin_ax0.set_ylim(*rates_ylim)
 
 	acc_ax0 = axes_task[0].twinx()
 	acc_ax0.set_yticks([])
-	acc_ax0.scatter(sigma_lst, sigma_acc[:,-1], c='black', marker='o', alpha=.5, s=15)
+	acc_ax0.scatter(np.exp(g_1_lst), sigma_acc[:,-1], c='black', marker='o', alpha=.5, s=15)
 	acc_ax0.set_ylim(*acc_ylim)
 
-
 	# Plot abruptness, latency and accuracy vs beta
-	axes_task[1].set_xlabel(r'Certainty ($\beta$)')
-	axes_task[1].set_xscale('log')
+	axes_task[1].set_xlabel(r'$\exp(g_2[P^*])$')
 	axes_task[1].set_yticks([])
-	axes_task[1].scatter(beta_lst, latencies_beta/10**3, c='red', marker='o', alpha=.5, s=15)
+	axes_task[1].scatter(np.exp(g_2_lst), latencies_beta/10**3, c='red', marker='o', alpha=.5, s=15)
 	axes_task[1].set_ylim(*times_ylim)
 
 	twin_ax1 = axes_task[1].twinx()
 	twin_ax1.set_ylabel(r'Abruptness ($\times 10^{-3}$)', color='blue')
-	twin_ax1.scatter(beta_lst, abruptness_beta, c='blue', marker='o', alpha=.5, s=15)
+	twin_ax1.scatter(np.exp(g_2_lst), abruptness_beta, c='blue', marker='o', alpha=.5, s=15)
 	twin_ax1.tick_params(axis='y', colors='blue')
 	twin_ax1.set_ylim(*rates_ylim)
 	# rescale abruptness so that it looks nicer
@@ -697,12 +735,12 @@ def plot_param_variation():
 	acc_ax1 = axes_task[1].twinx()
 	acc_ax1.spines['right'].set_position(('axes', 1.45))
 	acc_ax1.set_ylabel('Final Accuracy', color='black')
-	acc_ax1.scatter(beta_lst, beta_acc[:,-1], c='black', marker='o', alpha=.5, s=15)
+	acc_ax1.scatter(np.exp(g_2_lst), beta_acc[:,-1], c='black', marker='o', alpha=.5, s=15)
 	acc_ax1.set_ylim(*acc_ylim)
 
 
 	# save figure
-	fig_task.savefig("fig3b.pdf", format='pdf', dpi=500)
+	fig_task.savefig("fig6.pdf", format='pdf', dpi=500)
 
 	# fitted curve latency vs abruptness (Figure 3c)
 	fit_curve_f3 = f3(np.sort(abruptness_random), k0, k1)
@@ -720,7 +758,7 @@ def plot_param_variation():
 	ax_rand.plot(np.sort(abruptness_random), fit_curve_f3/10**3, 'g-')
 	ax_rand.annotate(r"$\tau\propto \rho^{-1}$", (.3,.3), xycoords='axes fraction', c='green')
 
-	fig_rand.savefig('fig3c.pdf', format='pdf', dpi=500)
+	fig_rand.savefig('fig4b.pdf', format='pdf', dpi=500)
 
 	return k0,k1,r_square_f0,r_square_f1,r_square_f2, r_square_f3
 
@@ -805,11 +843,19 @@ def plot_MI():
 	cbar.ax.tick_params(labelsize=10)
 
 
-	fig.savefig("fig4a.pdf", format='pdf', dpi=500)
+	fig.savefig("fig7a.pdf", format='pdf', dpi=500)
 
-def plot_random_task(a, b, c, N=100, T=3000, p0=None):
+def plot_population_curves():
 	"""
-	Run a single associative learning experiment with a preference-discouraging
+	Given random parameter variation data, plot the various learning curves
+	and a the population-averaged curve.
+	"""
+
+
+
+def plot_random_task(a, b, c, N=100, T=3000, p0=None, discourage=False):
+	"""
+	Run a single associative learning experiment with a preference-discouraging or random
 	reward schedule. Plot change in distribution over time, with inset showing the final
 	learned structure. 
 
@@ -828,6 +874,9 @@ def plot_random_task(a, b, c, N=100, T=3000, p0=None):
 	p0 : np array (N x N x 2) or None
 		Initial distribution, if None then initialize with the uniform
 		distribution.
+	discourage : bool
+		Whether or not to use the preference-discouraging data. If not, random
+		samples will be used throughout. 
 	"""
 
 	T = int(T)
@@ -835,14 +884,17 @@ def plot_random_task(a, b, c, N=100, T=3000, p0=None):
 	truth = 0.5 * np.ones((N,N,2))
 	# Generate 2*T samples from the ground truth
 	samples = gen_samples_cond(2*T,truth)
-
-	# Get results from learning with preference-discouraging
-	t,ps,msg = get_dist(samples, a, b, c, p0=p0, N=N, T=T, pd=True)
+	if discourage:
+		# Get results from learning with preference-discouraging
+		t,ps,msg = get_dist(samples, a, b, c, p0=p0, N=N, T=T, pd=True)
+	else:
+		# Get results from learning with preference-discouraging
+		t,ps,msg = get_dist(samples, a, b, c, p0=p0, N=N, T=T, pd=False)
 
 	# average magnitude of derivative of P_t(y|x) over time
 	dp_dt = np.abs(np.diff(ps, axis=0)).mean(axis=(1,2,3))
 
-	fig, ax = plt.subplots(figsize=(2.7,1.7), layout="constrained")
+	fig, ax = plt.subplots(figsize=(2.7,1.8), layout="constrained")
 	
 	# Plot change in P over time
 	ax.plot(t[1:], dp_dt*10000, 'k')
@@ -939,7 +991,10 @@ def plot_random_task(a, b, c, N=100, T=3000, p0=None):
 	axins.set_clip_on(False)
 	axins2.set_clip_on(False)
 
-	fig.savefig('fig4b.pdf', format='pdf', dpi=500)
+	if discourage==False:
+		fig.savefig('fig7b.pdf', format='pdf', dpi=500)
+	else:
+		fig.savefig('fig7c.pdf', format='pdf', dpi=500)
 
 	# return average change in probs at end of curve
 	delta_p = np.abs(ps[int(T*0.9)] - ps[-1]).mean()
