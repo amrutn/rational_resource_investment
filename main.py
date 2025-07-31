@@ -79,7 +79,7 @@ def main(args):
 			print(f"An error occurred during parameter variation data collection: {e}")
 
 	# Generating Figure 4 and 6, requires parameter variation data
-	if args.fig4_6
+	if args.fig4_6:
 		print("Generating Figures 4 and 6 (requires collected parameter data).")
 		try:
 			k0, k1,r_square_f0,r_square_f1,r_square_f2, r_square_f3 = plot_param_variation()
@@ -104,7 +104,7 @@ def main(args):
 		except Exception as e:
 			print(f"An error occurred generating synthetic Gallistel replica: {e}")
 
-	# Generating Figure 5a: plot exponentiated MI
+	# Generating Figure 7a: plot exponentiated MI
 	if args.fig7a:
 		print("Generating Figure 7a")
 		try:
@@ -112,7 +112,7 @@ def main(args):
 		except Exception as e:
 			print(f"An error occurred generating Figure 7a: {e}")
 
-	# Generating Figure 5b and 5c: plot dp/dt with uniform and discouraging reward schedule
+	# Generating Figure 7b and 7c: plot dp/dt with uniform and discouraging reward schedule
 	if args.fig7bc:
 		print("Generating Figure 7b")
 		try:
@@ -128,6 +128,32 @@ def main(args):
 		except Exception as e:
 			print(f"An error occurred generating Figure 7c: {e}")
 
+	# Generate supplemental figure for the incorrect input marginal
+	if args.fig8:
+		print("Generating Figure 8.")
+		try:
+			single_plot_wrong_inp_marg(a=0.001, b=0.001, c=0.01, sigma=10,beta=50,N=100, T=2000)
+		except Exception as e:
+			print(f"An error occurred generating Figure 8: {e}")
+
+	# Generate supplemental figure for a biased true distribution
+	if args.fig9:
+		print("Generating Figure 9.")
+		try:
+			single_plot_biased_truth(a=0.001, b=0.01, c=0.01, sigma=20,beta=50,N=100, T=2000)
+		except Exception as e:
+			print(f"An error occurred generating Figure 9: {e}")
+	if args.fig10:
+		print("Generating Figure 10.")
+		try:
+			# plot showing the sudden insight
+			single_plot_nolog(a=0.001, b=0.01, c=0.01, sigma=20,beta=50,N=100, T=2000)
+			# plot showing the superstition
+			plot_random_task(a=0.001, b=0.01, c=0.01, N=100, T=4000, discourage=False)
+			# plot showing the persistent superstition
+			plot_random_task(a=0.001, b=0.01, c=0.01, N=100, T=4000, discourage=True)
+		except Exception as e:
+			print(f"An error occurred generating Figure 10: {e}")
 
 	print("Script Finished")
 	return
@@ -148,6 +174,12 @@ if __name__ == "__main__":
     	help='Generate Figure 7a (Exponentiated Mutual Information).')
 	parser.add_argument('--fig7bc', action='store_true', 
     	help='Generate Figure 7b and 7c (Persistence/Random Task).')
+	parser.add_argument('--fig8', action='store_true', 
+    	help='Generate Figure 8 (Learning curve for incorrect input marginal).')
+	parser.add_argument('--fig9', action='store_true', 
+    	help='Generate Figure 9 (Learning curve for biased true distribution).')
+	parser.add_argument('--fig10', action='store_true', 
+    	help='Generate Figure 10 (Learning curve for smoothness without log).')
 
 	# Flags to enable data collection (default is False)
 	parser.add_argument('--collect-param-data', action='store_true', 

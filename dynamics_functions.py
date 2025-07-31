@@ -1,13 +1,13 @@
 import numpy as np
 from scipy.integrate import solve_ivp
 from scipy.ndimage import gaussian_filter
-from scipy.special import expit # sigmoid function
+from scipy.special import expit, logit # sigmoid function
 
 # rng for this code
 rng = np.random.default_rng(42)
 
 
-def gen_dist_cond(sigma, beta, N=100):
+def gen_dist_cond(sigma, beta, p1_target=.5, N=100):
 	"""
 	Generate conditional P(y|x) for each grid point, x with varying volatility
 	over x and uncertainty.
@@ -20,6 +20,8 @@ def gen_dist_cond(sigma, beta, N=100):
 	beta : float
 		Gain of the sigmoid nonlinearity, controls uncertainty.
 		Larger gain = probabilities closer to 0 or 1.
+	p1_target : float
+		What we want P(y=1) to be.
 	N : int
 		Size of the grid on each side
 	Returns
@@ -44,14 +46,14 @@ def gen_dist_cond(sigma, beta, N=100):
 	else:
 		field = base # no smoothing if sigma is near 0
 
-	# Normalize for 0 mean, std 1
+	# Normalize for biased mean, std 1
 	field -= np.mean(field)
 	std = np.std(field)
 	if std > 1e-9:
-		field /=std # avoid dividing by 0 if field is constant
+		field /= std # avoid dividing by 0 if field is constant
 
 	# map to probabilities
-	p_y1 = expit(beta * field)
+	p_y1 = expit(beta * (field + logit(p1_target)))
 
 	# final dist:
 	dist = np.zeros((N, N, 2))
@@ -91,7 +93,7 @@ def gen_samples_cond(num_samples, dist):
 	return np.hstack((coords,labels[:,None]))
 
 
-# Compute g_1'/P^*(x)
+# Compute g_1'
 def g1_prime(p):
 	"""
 	Computes derivative of the mutual information constraint
@@ -115,7 +117,7 @@ def g1_prime(p):
 
 	return np.log(p) - np.log(p_margin)
 
-# Compute \tilde g_1/P^*(x)
+# Compute \tilde g_1
 def g1_tilde(p):
 	"""
 	Computes mean-subtracted g1_prime.
@@ -137,7 +139,54 @@ def g1_tilde(p):
 
 	return deriv - deriv_mean
 
-# Compute g2'/P^*(x) after setting \delta x = 1
+# Compute modified g_1' no log
+def g1_prime_nolog(p):
+	"""
+	Computes derivative of the mutual information constraint
+	with respect to P(y|x)
+
+	Params
+	------
+	p : 3D numpy array (N x N x 2)
+		P(y|x) where
+		p[i,j,0] = P(0|x_ij)
+		p[i,j,1] = P(1|x_ij)
+
+	Returns
+	-------
+	deriv : 3D numpy array (N x N x 2)
+		Derivative of Mutual Information
+	"""
+	N = p.shape[0]
+	# Compute marginalized distribution P(y)
+	p_margin = p.mean(axis=(0,1), keepdims=True)
+	
+
+	return 2 * (p-p_margin) * (1-1/N**2)
+
+# Compute \tilde g_1 nolog
+def g1_tilde_nolog(p):
+	"""
+	Computes mean-subtracted g1_prime.
+
+	Params
+	------
+	p : 3D numpy array (N x N x 2)
+		P(y|x) where
+		p[i,j,0] = P(0|x_ij)
+		p[i,j,1] = P(1|x_ij)
+
+	Returns
+	-------
+	mean_sub_deriv : 3D numpy array (N x N x 2)
+		Derivative of Mutual Information with 0 mean
+	"""
+	deriv = g1_prime_nolog(p)
+	deriv_mean = (deriv*p).sum(axis=-1,keepdims=True)
+
+	return deriv - deriv_mean
+
+# Compute g2' after setting \delta x = 1
 def g2_prime(p):
 	"""
 	Computes derivative of the smoothness constraint
@@ -167,10 +216,10 @@ def g2_prime(p):
 	p4 = np.roll(p,-1,axis=1)
 	p4[:,-1] = p[:,-1] # Boundary condition
 
-	return  ((4*p - p1 - p2 - p3 - p4)/p 
+	return  1/2 * ((4*p - p1 - p2 - p3 - p4)/p 
 		+ (4*np.log(p)-np.log(p1)-np.log(p2)-np.log(p3)-np.log(p4)))
 
-# Compute \tilde g_2/P^*(x)
+# Compute \tilde g_2
 def g2_tilde(p):
 	"""
 	Computes mean-subtracted g2_prime.
@@ -192,7 +241,61 @@ def g2_tilde(p):
 
 	return deriv - deriv_mean
 
-def get_dist(samples, a, b, c, p0=None, N=100, T=1000, pd=False):
+# Compute alternative g2_prime without the log
+def g2_prime_nolog(p):
+	"""
+	Computes derivative of the smoothness constraint
+	without logarithm with respect to P(y|x)
+
+	Params
+	------
+	p : 3D numpy array (N x N x 2)
+		P(y|x) where
+		p[i,j,0] = P(0|x_ij)
+		p[i,j,1] = P(1|x_ij)
+
+	Returns
+	-------
+	deriv : np array (N x N x 2)
+		Derivative of the distribution volatility
+	"""
+	p1 = np.roll(p,1,axis=0)
+	p1[0,:] = p[0,:] # Boundary condition
+
+	p2 = np.roll(p,1,axis=1)
+	p2[:,0] = p[:,0] # Boundary condition
+
+	p3 = np.roll(p,-1,axis=0)
+	p3[-1,:] = p[-1,:] # Boundary condition
+
+	p4 = np.roll(p,-1,axis=1)
+	p4[:,-1] = p[:,-1] # Boundary condition
+
+	return 4*p - p1 - p2 - p3 - p4
+
+# Compute \tilde g_2/P^*(x) for the nolog case
+def g2_tilde_nolog(p):
+	"""
+	Computes mean-subtracted g2_prime.
+
+	Params
+	------
+	p : 3D numpy array (N x N x 2)
+		P(y|x) where
+		p[i,j,0] = P(0|x_ij)
+		p[i,j,1] = P(1|x_ij)
+
+	Returns
+	-------
+	mean_sub_deriv : 3D numpy array (N x N x 2)
+		Derivative of volatility with 0 mean
+	"""
+	deriv = g2_prime_nolog(p)
+	deriv_mean = (deriv*p).sum(axis=-1,keepdims=True)
+
+	return deriv - deriv_mean
+
+def get_dist(samples, a, b, c, p0=None, N=100, T=1000, pd=False, nolog=False):
 	"""
 	Compute learning dynamics by integrating first-order ODE
 	equation of motion. Recall, we set delta x = 0 
@@ -217,6 +320,8 @@ def get_dist(samples, a, b, c, p0=None, N=100, T=1000, pd=False):
 	pd : bool
 		If true, use a preference-discouraging reward schedule.
 		(P^*(y|x) = 1-hat P(y|x))
+	nolog : bool
+		If true, compute using the alternative smoothness.
 	
 	Returns
 	-------
@@ -261,6 +366,9 @@ def get_dist(samples, a, b, c, p0=None, N=100, T=1000, pd=False):
 		
 		# compute p_dot
 		p_dot = a*m - p * (a*m_x + b*g2_tilde(p)- c*g1_tilde(p))
+
+		if nolog:
+			p_dot = a*m - p * (a*m_x + b*g2_tilde_nolog(p)- c*g1_tilde_nolog(p))
 
 		# set p_dot to 0 when P(y|x) is near 0 or 1.
 		# This avoids numerical issues

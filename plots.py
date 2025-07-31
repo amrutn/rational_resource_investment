@@ -8,6 +8,7 @@ from scipy.optimize import curve_fit
 from pathlib import Path
 from dynamics_functions import *
 from tqdm import tqdm
+import matplotlib.patches as patches
 
 mpl.rcParams['axes.linewidth'] = 2
 plt.rcParams.update({
@@ -15,7 +16,7 @@ plt.rcParams.update({
 })
 
 
-# Figure 1, heatmap of constraint functions for different P(x)
+# Figure 2b, heatmap of constraint functions for different P(x)
 def px_vs_constraint(sigma, beta, p_high=0.99, N=100, nsamples=100, collect_data=True):
 	"""
 	For each possible perimeter and area of the high likelihood rectangle, as 
@@ -112,7 +113,7 @@ def px_vs_constraint(sigma, beta, p_high=0.99, N=100, nsamples=100, collect_data
 
 	return mean_mi_dev/mean_vol_dev
 
-# Figure 2b
+# Figure 3b
 def single_plot(a, b, c, sigma, beta, N=100, T=1000, p0=None):
 	"""
 	Run a single associative learning experiment and plot task accuracy over time.
@@ -161,12 +162,12 @@ def single_plot(a, b, c, sigma, beta, N=100, T=1000, p0=None):
 	ax_res.set_ylabel('Accuracy')
 
 	axs['TopRight'].imshow(truth[:,:,1], cmap='coolwarm',vmin=0, vmax=1, origin='lower')
-	axs['TopRight'].annotate("$P^{*}(1|x)$", (-0.05,-0.3), xycoords='axes fraction')
+	axs['TopRight'].annotate("$P^{*}(1|x)$", (-0.05,-0.4), xycoords='axes fraction')
 	axs['TopRight'].set_xticks([])
 	axs['TopRight'].set_yticks([])
 
 	axs['BottomRight'].imshow(ps[-1,:,:,1], cmap='coolwarm',vmin=0, vmax=1, origin='lower')
-	axs['BottomRight'].annotate(r"$\hat P_{T}(1|x)$", (-0.05,-0.3), xycoords='axes fraction')
+	axs['BottomRight'].annotate(r"$\hat P_{T}(1|x)$", (-0.05,-0.4), xycoords='axes fraction')
 	axs['BottomRight'].set_xticks([])
 	axs['BottomRight'].set_yticks([])
 
@@ -701,7 +702,7 @@ def plot_param_variation():
 
 
 	# Plot latency, abruptness, final accuracy vs sigma
-	axes_task[0].set_xlabel(r'$\exp(g_1[P^*])$')
+	axes_task[0].set_xlabel(r'$\exp(g_2[P^*])$')
 	axes_task[0].set_ylabel(r'Latency ($\times 10^3$)', color='red')
 	axes_task[0].tick_params(axis='y', colors='red')
 	axes_task[0].scatter(np.exp(g_1_lst), latencies_sigma/10**3, c='red', marker='o', alpha=.5, s=15)
@@ -718,7 +719,7 @@ def plot_param_variation():
 	acc_ax0.set_ylim(*acc_ylim)
 
 	# Plot abruptness, latency and accuracy vs beta
-	axes_task[1].set_xlabel(r'$\exp(g_2[P^*])$')
+	axes_task[1].set_xlabel(r'$\exp(g_1[P^*])$')
 	axes_task[1].set_yticks([])
 	axes_task[1].scatter(np.exp(g_2_lst), latencies_beta/10**3, c='red', marker='o', alpha=.5, s=15)
 	axes_task[1].set_ylim(*times_ylim)
@@ -837,7 +838,7 @@ def plot_MI():
 
 	# Colorbar
 	cbar = fig.colorbar(im, ax=ax, fraction=0.05, pad=0.04)
-	cbar.set_label(r"$\exp(g_2[P])$", rotation=270, labelpad=15)
+	cbar.set_label(r"$\exp(g_1[P])$", rotation=270, labelpad=15)
 	# Set specific ticks on the colorbar
 	cbar.set_ticks(np.linspace(1, 2, 6))
 	cbar.ax.tick_params(labelsize=10)
@@ -1001,5 +1002,341 @@ def plot_random_task(a, b, c, N=100, T=3000, p0=None, discourage=False):
 
 	return delta_p
 
+def single_plot_wrong_inp_marg(a, b, c, sigma, beta, N=100, T=1000, p0=None):
+	"""
+	Run a single associative learning experiment and plot task accuracy over time.
+
+	Params
+	------
+	a : float
+		Parameter controlling influence of new data samples.
+	b : float
+		Parameter controlling allowed distribution volatility.
+	c : float
+		Parameter controlling expected mutual information.
+	sigma : float
+		Controls volatility of true distribution. Higher sigma
+		means less volatile.
+	beta : float
+		Controls uncertainty in true distribution. Higher beta implies
+		less uncertainty (more biased towards 0 or 1)
+	N : int
+		Size of the student's expected input domain on each side
+	T : float
+		Time to run integration
+	p0 : np array (N x N x 2) or None
+		Initial distribution, if None then initialize with the uniform
+		distribution.
+	"""
+	T = int(T)
+	# Generate true distribution
+	truth = gen_dist_cond(sigma, beta, N=N)
+	# Generate 2*T samples from the ground truth (only in the middle quarter of the domain)
+	n = int(N/4)
+	samples = gen_samples_cond(2*T,truth[n:3*n,n:3*n,:])
+
+	for i in range(len(samples)):
+		sample = samples[i]
+		samples[i] = (sample[0] + n,sample[1] + n, sample[2])
+
+	# Get results
+	t,ps,msg = get_dist(samples, a, b, c, p0=p0, N=N, T=T)
+
+	# probability of correct classification over time
+	accuracy = (truth*ps).sum(axis=-1)[:,n:3*n,n:3*n].mean(axis=(1,2))
+
+	fig = plt.figure(constrained_layout=True, figsize=(2.9,1.7))
+	axs = fig.subplot_mosaic([['Left', 'TopRight'],['Left', 'BottomRight']],
+                          gridspec_kw={'width_ratios':[2, 1]})
+	ax_res = axs['Left']
+	ax_res.plot(t, accuracy, 'k')
+	ax_res.set_ylim(top=1.0)
+	ax_res.set_xlabel('Time')
+	ax_res.set_ylabel('Accuracy')
+
+	axs['TopRight'].imshow(truth[:,:,1], cmap='coolwarm',vmin=0, vmax=1, origin='lower')
+	axs['TopRight'].annotate("$P^{*}(1|x)$", (-0.05,-0.4), xycoords='axes fraction')
+	axs['TopRight'].set_xticks([])
+	axs['TopRight'].set_yticks([])
+
+	axs['BottomRight'].imshow(ps[-1,:,:,1], cmap='coolwarm',vmin=0, vmax=1, origin='lower')
+	axs['BottomRight'].annotate(r"$\hat P_{T}(1|x)$", (-0.05,-0.4), xycoords='axes fraction')
+	axs['BottomRight'].set_xticks([])
+	axs['BottomRight'].set_yticks([])
+
+	fig.savefig('fig8.pdf', format='pdf', dpi=500)
 
 
+def single_plot_biased_truth(a, b, c, sigma, beta, N=100, T=1000, p0=None):
+	"""
+	Run a single associative learning experiment and plot task accuracy over time.
+
+	Params
+	------
+	a : float
+		Parameter controlling influence of new data samples.
+	b : float
+		Parameter controlling allowed distribution volatility.
+	c : float
+		Parameter controlling expected mutual information.
+	sigma : float
+		Controls volatility of true distribution. Higher sigma
+		means less volatile.
+	beta : float
+		Controls uncertainty in true distribution. Higher beta implies
+		less uncertainty (more biased towards 0 or 1)
+	N : int
+		Size of the student's expected input domain on each side
+	T : float
+		Time to run integration
+	p0 : np array (N x N x 2) or None
+		Initial distribution, if None then initialize with the uniform
+		distribution.
+	"""
+	T = int(T)
+	# Generate true distribution, biased towards y=0, 25-75 split
+	truth = gen_dist_cond(sigma, beta, p1_target=.33, N=N)
+
+	print(np.mean(truth[:,:,0]))
+	print(np.mean(truth))
+
+	# Generate 2*T samples from the ground truth (only in the middle quarter of the domain)
+	n = int(N/4)
+	samples = gen_samples_cond(2*T,truth)
+
+	# Get results
+	t,ps,msg = get_dist(samples, a, b, c, p0=p0, N=N, T=T)
+
+	# probability of correct classification over time
+	accuracy = (truth*ps).sum(axis=-1).mean(axis=(1,2))
+
+	fig = plt.figure(constrained_layout=True, figsize=(2.9,1.7))
+	axs = fig.subplot_mosaic([['Left', 'TopRight'],['Left', 'BottomRight']],
+                          gridspec_kw={'width_ratios':[2, 1]})
+	ax_res = axs['Left']
+	ax_res.plot(t, accuracy, 'k')
+	ax_res.set_ylim(top=1.0)
+	ax_res.set_xlabel('Time')
+	ax_res.set_ylabel('Accuracy')
+
+	axs['TopRight'].imshow(truth[:,:,1], cmap='coolwarm',vmin=0, vmax=1, origin='lower')
+	axs['TopRight'].annotate("$P^{*}(1|x)$", (-0.05,-0.4), xycoords='axes fraction')
+	axs['TopRight'].set_xticks([])
+	axs['TopRight'].set_yticks([])
+
+	axs['BottomRight'].imshow(ps[-1,:,:,1], cmap='coolwarm',vmin=0, vmax=1, origin='lower')
+	axs['BottomRight'].annotate(r"$\hat P_{T}(1|x)$", (-0.05,-0.4), xycoords='axes fraction')
+	axs['BottomRight'].set_xticks([])
+	axs['BottomRight'].set_yticks([])
+
+	fig.savefig('fig9.pdf', format='pdf', dpi=500)
+
+
+def single_plot_nolog(a, b, c, sigma, beta, N=100, T=1000, p0=None):
+	"""
+	Run a single associative learning experiment and plot task accuracy over time.
+	Use a modified prior without the logarithm. 
+	Params
+	------
+	a : float
+		Parameter controlling influence of new data samples.
+	b : float
+		Parameter controlling allowed distribution volatility.
+	c : float
+		Parameter controlling expected mutual information.
+	sigma : float
+		Controls volatility of true distribution. Higher sigma
+		means less volatile.
+	beta : float
+		Controls uncertainty in true distribution. Higher beta implies
+		less uncertainty (more biased towards 0 or 1)
+	N : int
+		Size of the grid on each side
+	T : float
+		Time to run integration
+	p0 : np array (N x N x 2) or None
+		Initial distribution, if None then initialize with the uniform
+		distribution.
+	"""
+	T = int(T)
+	# Generate true distribution
+	truth = gen_dist_cond(sigma, beta, N=N)
+	# Generate 2*T samples from the ground truth
+	samples = gen_samples_cond(2*T,truth)
+
+	# Get results
+	t,ps,msg = get_dist(samples, a, b, c, p0=p0, N=N, T=T, nolog=True)
+
+	# probability of correct classification over time
+	accuracy = (truth*ps).sum(axis=-1).mean(axis=(1,2))
+
+	fig = plt.figure(constrained_layout=True, figsize=(2.9,1.7))
+	axs = fig.subplot_mosaic([['Left', 'TopRight'],['Left', 'BottomRight']],
+                          gridspec_kw={'width_ratios':[2, 1]})
+	ax_res = axs['Left']
+	ax_res.plot(t, accuracy, 'k')
+	ax_res.set_ylim(top=1.0)
+	ax_res.set_xlabel('Time')
+	ax_res.set_ylabel('Accuracy')
+
+	axs['TopRight'].imshow(truth[:,:,1], cmap='coolwarm',vmin=0, vmax=1, origin='lower')
+	axs['TopRight'].annotate("$P^{*}(1|x)$", (-0.05,-0.4), xycoords='axes fraction')
+	axs['TopRight'].set_xticks([])
+	axs['TopRight'].set_yticks([])
+
+	axs['BottomRight'].imshow(ps[-1,:,:,1], cmap='coolwarm',vmin=0, vmax=1, origin='lower')
+	axs['BottomRight'].annotate(r"$\hat P_{T}(1|x)$", (-0.05,-0.4), xycoords='axes fraction')
+	axs['BottomRight'].set_xticks([])
+	axs['BottomRight'].set_yticks([])
+
+	fig.savefig('fig10a.pdf', format='pdf', dpi=500)
+
+
+# make superstition plot for modified prior.
+def plot_random_task_nolog(a, b, c, N=100, T=3000, p0=None, discourage=False):
+	"""
+	Run a single associative learning experiment with a preference-discouraging or random
+	reward schedule. Plot change in distribution over time, with inset showing the final
+	learned structure. 
+
+	Params
+	------
+	a : float
+		Parameter controlling influence of new data samples.
+	b : float
+		Parameter controlling allowed distribution volatility.
+	c : float
+		Parameter controlling expected mutual information.
+	N : int
+		Size of the grid on each side
+	T : float
+		Time to run integration
+	p0 : np array (N x N x 2) or None
+		Initial distribution, if None then initialize with the uniform
+		distribution.
+	discourage : bool
+		Whether or not to use the preference-discouraging data. If not, random
+		samples will be used throughout. 
+	"""
+
+	T = int(T)
+	# Generate fully random true distribution
+	truth = 0.5 * np.ones((N,N,2))
+	# Generate 2*T samples from the ground truth
+	samples = gen_samples_cond(2*T,truth)
+	if discourage:
+		# Get results from learning with preference-discouraging
+		t,ps,msg = get_dist(samples, a, b, c, p0=p0, N=N, T=T, pd=True, nolog=True)
+	else:
+		# Get results from learning with preference-discouraging
+		t,ps,msg = get_dist(samples, a, b, c, p0=p0, N=N, T=T, pd=False, nolog=True)
+
+	# average magnitude of derivative of P_t(y|x) over time
+	dp_dt = np.abs(np.diff(ps, axis=0)).mean(axis=(1,2,3))
+
+	fig, ax = plt.subplots(figsize=(2.7,1.8), layout="constrained")
+	
+	# Plot change in P over time
+	ax.plot(t[1:], dp_dt*10000, 'k')
+	ax.set_xlabel('Time')
+	ax.set_ylabel(r'Update Speed ($\times 10^{-4}$)')
+
+	# Create inset with final dist
+	inset_bounds = [0.65, 0.65, 0.3, 0.3] # inset location, size
+	axins = ax.inset_axes(inset_bounds)
+	axins.annotate(r"$\hat P_T$", (-0.15,-0.45), xycoords='axes fraction')
+
+	# show final output
+	axins.imshow(ps[-1,:,:,1], cmap='coolwarm', vmin=0, vmax=1, origin='lower')
+	axins.set_xticks([])
+	axins.set_yticks([])
+
+	# Draw connecting lines for inset
+	# connection coords for bottom right
+	xyA = (0.95, 0.075)
+	# connection coords for bottom right and top rightof inset
+	xyB_corner1 = (1.0, 1.0)
+	xyB_corner2 = (1.0, 0.0)
+
+	# Create first line to bottom-left of inset
+	con1 = ConnectionPatch(
+	    xyA=xyA, coordsA=ax.transAxes,
+	    xyB=xyB_corner1, coordsB=axins.transAxes,
+	    arrowstyle="-", 
+	    linestyle="--",
+	    color="gray",
+	    linewidth=1.0
+	)
+
+	# Create second line to bottom right of inset
+	con2 = ConnectionPatch(
+	    xyA=xyA, coordsA=ax.transAxes,
+	    xyB=xyB_corner2, coordsB=axins.transAxes,
+	    arrowstyle="-",
+	    linestyle="--",
+	    color="gray",
+	    linewidth=1.0
+	)
+
+	fig.add_artist(con1)
+	fig.add_artist(con2)
+
+	# show final output
+	axins.imshow(ps[-1,:,:,1], cmap='coolwarm', vmin=0, vmax=1, origin='lower')
+	axins.set_xticks([])
+	axins.set_yticks([])
+
+	# Make second inset
+	inset_bounds2 = [0.4, 0.3, 0.3, 0.3] # inset location, size
+	axins2= ax.inset_axes(inset_bounds2)
+	axins2.annotate(r"$\hat P_{.75T}$", (-0.15,-0.45), xycoords='axes fraction')
+
+
+	# Draw connecting lines for inset
+	# connection coords for bottom right
+	xyA = (0.72, 0.075)
+	# connection coords for bottom left and top left of inset
+	xyB_corner1 = (1.0,0.0)
+	xyB_corner2 = (1.0,1.0)
+
+	# Create first line to bottom-left of inset
+	con3 = ConnectionPatch(
+	    xyA=xyA, coordsA=ax.transAxes,
+	    xyB=xyB_corner1, coordsB=axins2.transAxes,
+	    arrowstyle="-", 
+	    linestyle="--",
+	    color="gray",
+	    linewidth=1.0
+	)
+
+	# Create second line to bottom right of inset
+	con4 = ConnectionPatch(
+	    xyA=xyA, coordsA=ax.transAxes,
+	    xyB=xyB_corner2, coordsB=axins2.transAxes,
+	    arrowstyle="-",
+	    linestyle="--",
+	    color="gray",
+	    linewidth=1.0
+	)
+
+	fig.add_artist(con3)
+	fig.add_artist(con4)
+
+	# show final output
+	axins2.imshow(ps[int(.75*T),:,:,1], cmap='coolwarm', vmin=0, vmax=1, origin='lower')
+	axins2.set_xticks([])
+	axins2.set_yticks([])
+
+	ax.set_clip_on(False)
+	axins.set_clip_on(False)
+	axins2.set_clip_on(False)
+
+	if discourage==False:
+		fig.savefig('fig10b.pdf', format='pdf', dpi=500)
+	else:
+		fig.savefig('fig10c.pdf', format='pdf', dpi=500)
+
+	# return average change in probs at end of curve
+	delta_p = np.abs(ps[int(T*0.9)] - ps[-1]).mean()
+
+	return delta_p
