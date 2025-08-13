@@ -93,8 +93,8 @@ def gen_samples_cond(num_samples, dist):
 	return np.hstack((coords,labels[:,None]))
 
 
-# Compute g_1'
-def g1_prime(p):
+# Compute I'
+def I_prime(p):
 	"""
 	Computes derivative of the mutual information constraint
 	with respect to P(y|x)
@@ -117,10 +117,10 @@ def g1_prime(p):
 
 	return np.log(p) - np.log(p_margin)
 
-# Compute \tilde g_1
-def g1_tilde(p):
+# Compute \tilde I
+def I_tilde(p):
 	"""
-	Computes mean-subtracted g1_prime.
+	Computes mean-subtracted I_prime.
 
 	Params
 	------
@@ -134,13 +134,13 @@ def g1_tilde(p):
 	mean_sub_deriv : 3D numpy array (N x N x 2)
 		Derivative of Mutual Information with 0 mean
 	"""
-	deriv = g1_prime(p)
+	deriv = I_prime(p)
 	deriv_mean = (deriv*p).sum(axis=-1,keepdims=True)
 
 	return deriv - deriv_mean
 
-# Compute modified g_1' no log
-def g1_prime_nolog(p):
+# Compute modified I' no log
+def I_prime_nolog(p):
 	"""
 	Computes derivative of the mutual information constraint
 	with respect to P(y|x)
@@ -162,12 +162,12 @@ def g1_prime_nolog(p):
 	p_margin = p.mean(axis=(0,1), keepdims=True)
 	
 
-	return 2 * (p-p_margin) * (1-1/N**2)
+	return 2 * (p-p_margin)
 
-# Compute \tilde g_1 nolog
-def g1_tilde_nolog(p):
+# Compute \tilde I nolog
+def I_tilde_nolog(p):
 	"""
-	Computes mean-subtracted g1_prime.
+	Computes mean-subtracted I_prime.
 
 	Params
 	------
@@ -181,13 +181,13 @@ def g1_tilde_nolog(p):
 	mean_sub_deriv : 3D numpy array (N x N x 2)
 		Derivative of Mutual Information with 0 mean
 	"""
-	deriv = g1_prime_nolog(p)
+	deriv = I_prime_nolog(p)
 	deriv_mean = (deriv*p).sum(axis=-1,keepdims=True)
 
 	return deriv - deriv_mean
 
-# Compute g2' after setting \delta x = 1
-def g2_prime(p):
+# Compute R' after setting \delta x = 1
+def R_prime(p):
 	"""
 	Computes derivative of the smoothness constraint
 	with respect to P(y|x)
@@ -219,10 +219,10 @@ def g2_prime(p):
 	return  1/2 * ((4*p - p1 - p2 - p3 - p4)/p 
 		+ (4*np.log(p)-np.log(p1)-np.log(p2)-np.log(p3)-np.log(p4)))
 
-# Compute \tilde g_2
-def g2_tilde(p):
+# Compute \tilde R
+def R_tilde(p):
 	"""
-	Computes mean-subtracted g2_prime.
+	Computes mean-subtracted R_prime.
 
 	Params
 	------
@@ -236,13 +236,13 @@ def g2_tilde(p):
 	mean_sub_deriv : 3D numpy array (N x N x 2)
 		Derivative of volatility with 0 mean
 	"""
-	deriv = g2_prime(p)
+	deriv = R_prime(p)
 	deriv_mean = (deriv*p).sum(axis=-1,keepdims=True)
 
 	return deriv - deriv_mean
 
-# Compute alternative g2_prime without the log
-def g2_prime_nolog(p):
+# Compute alternative R_prime without the log
+def R_prime_nolog(p):
 	"""
 	Computes derivative of the smoothness constraint
 	without logarithm with respect to P(y|x)
@@ -273,10 +273,10 @@ def g2_prime_nolog(p):
 
 	return 4*p - p1 - p2 - p3 - p4
 
-# Compute \tilde g_2/P^*(x) for the nolog case
-def g2_tilde_nolog(p):
+# Compute \tilde R for the nolog case
+def R_tilde_nolog(p):
 	"""
-	Computes mean-subtracted g2_prime.
+	Computes mean-subtracted R_prime.
 
 	Params
 	------
@@ -290,7 +290,7 @@ def g2_tilde_nolog(p):
 	mean_sub_deriv : 3D numpy array (N x N x 2)
 		Derivative of volatility with 0 mean
 	"""
-	deriv = g2_prime_nolog(p)
+	deriv = R_prime_nolog(p)
 	deriv_mean = (deriv*p).sum(axis=-1,keepdims=True)
 
 	return deriv - deriv_mean
@@ -365,10 +365,10 @@ def get_dist(samples, a, b, c, p0=None, N=100, T=1000, pd=False, nolog=False):
 		m_x = m.sum(axis=-1, keepdims=True)
 		
 		# compute p_dot
-		p_dot = a*m - p * (a*m_x + b*g2_tilde(p)- c*g1_tilde(p))
-
 		if nolog:
-			p_dot = a*m - p * (a*m_x + b*g2_tilde_nolog(p)- c*g1_tilde_nolog(p))
+			p_dot = a*m - p * (a*m_x + b*R_tilde_nolog(p)- c*I_tilde_nolog(p))
+		else:
+			p_dot = a*m - p * (a*m_x + b*R_tilde(p)- c*I_tilde(p))
 
 		# set p_dot to 0 when P(y|x) is near 0 or 1.
 		# This avoids numerical issues
@@ -467,7 +467,7 @@ def gen_dist_x(w, h, p_high=0.99, N=100):
 # Compute Mutual Information of joint dist
 def compute_mi_joint(px,py_x):
 	"""
-	Compute mutual information of joint distribution p, defined by g_1[p]
+	Compute mutual information of joint distribution p, defined by I[p]
 
 	Params
 	------
@@ -488,7 +488,7 @@ def compute_mi_joint(px,py_x):
 # Compute volatility of joint dist
 def compute_vol_joint(px,py_x):
 	"""
-	Compute the volatility of joint distribution p, defined by g_2[p]
+	Compute the volatility given the marginal and conditional, defined by -R[p]
 	for discrete cues.
 
 	Params
@@ -511,14 +511,8 @@ def compute_vol_joint(px,py_x):
 	p2y_x = np.roll(py_x,1,axis=1)
 	p2y_x[:,0] = py_x[:,0] # Boundary condition
 
-	p3y_x = np.roll(py_x,-1,axis=0)
-	p3y_x[-1,:] = py_x[-1,:] # Boundary condition
-
-	p4y_x = np.roll(py_x,-1,axis=1)
-	p4y_x[:,-1] = py_x[:,-1] # Boundary condition
-
-	return (px*py_x*(4*np.log(py_x+eps) - np.log(p1y_x+eps) - 
-		np.log(p2y_x+eps) - np.log(p3y_x+eps) - np.log(p4y_x+eps))).sum(axis=-1)[px[:,:,0]>0].sum()
+	return (px*py_x*((np.log(py_x+eps) - np.log(p1y_x+eps))**2 + 
+		(np.log(py_x+eps) - np.log(p2y_x+eps))**2)).sum(axis=-1)[px[:,:,0]>0].sum()
 
 def compute_entropy(p):
 	"""
