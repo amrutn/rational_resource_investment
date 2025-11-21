@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 from matplotlib.patches import ConnectionPatch
 import matplotlib.colors as mcolors
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
@@ -9,14 +10,15 @@ from pathlib import Path
 from dynamics_functions import *
 from tqdm import tqdm
 import matplotlib.patches as patches
+import pandas as pd
 
 mpl.rcParams['axes.linewidth'] = 2
 plt.rcParams.update({
-    "text.usetex": True
+	"text.usetex": True
 })
 
 
-# Figure 7b, heatmap of constraint functions for different P(x)
+# Figure 2b, heatmap of constraint functions for different P(x)
 def px_vs_constraint(sigma, beta, p_high=0.99, N=100, nsamples=100, collect_data=True):
 	"""
 	For each possible perimeter and area of the high likelihood rectangle, as 
@@ -99,21 +101,21 @@ def px_vs_constraint(sigma, beta, p_high=0.99, N=100, nsamples=100, collect_data
 
 	fig,ax = plt.subplots(1,1, figsize=(2.5,1.7), layout="constrained")
 	sc = ax.scatter(dimensions, entropies, 
-                 c=combined,           
-                 cmap='Purples',        # Choose a colormap
-                 marker='s',            # Use square markers
-                 s=2        # Set marker size
-                )
+				 c=combined,           
+				 cmap='Purples',        # Choose a colormap
+				 marker='s',            # Use square markers
+				 s=2        # Set marker size
+				)
 	cbar = plt.colorbar(sc)
 	cbar.set_label(r'Prior')
-	ax.set_ylabel(r'Cost: $H[x]$')
+	ax.set_ylabel(r'Entropy $H[x]$')
 	ax.set_xlabel(r'Effective Dimensionality')
 
-	fig.savefig('fig7b.pdf', format='pdf', dpi=500)
+	fig.savefig('fig2b.pdf', format='pdf', dpi=500)
 
 	return mean_mi_dev/mean_vol_dev
 
-# Figure 2b
+# Figure 3b
 def single_plot(a, b, c, sigma, beta, N=100, T=1000, p0=None):
 	"""
 	Run a single associative learning experiment and plot task accuracy over time.
@@ -154,7 +156,7 @@ def single_plot(a, b, c, sigma, beta, N=100, T=1000, p0=None):
 
 	fig = plt.figure(constrained_layout=True, figsize=(2.9,1.7))
 	axs = fig.subplot_mosaic([['Left', 'TopRight'],['Left', 'BottomRight']],
-                          gridspec_kw={'width_ratios':[2, 1]})
+						  gridspec_kw={'width_ratios':[2, 1]})
 	ax_res = axs['Left']
 	ax_res.plot(t, accuracy, 'k')
 	ax_res.set_ylim(top=1.0)
@@ -171,10 +173,10 @@ def single_plot(a, b, c, sigma, beta, N=100, T=1000, p0=None):
 	axs['BottomRight'].set_xticks([])
 	axs['BottomRight'].set_yticks([])
 
-	fig.savefig('fig2b.pdf', format='pdf', dpi=500)
+	fig.savefig('fig3b.pdf', format='pdf', dpi=500)
 
 
-def collect_data_param_variation(a_lst, b_lst, c_lst, sigma_lst, beta_lst, num=30, N=100, T=3000):
+def collect_data_param_variation(a_lst, b_lst, c_lst, sigma_lst, beta_lst, num=30, N=100, T=3000, supplement=False):
 	"""
 	Compute how varying equation of motion, and task parameters changes transition time,
 	abruptness and final accuracy. Compare to the analytically derived scaling laws.
@@ -200,6 +202,8 @@ def collect_data_param_variation(a_lst, b_lst, c_lst, sigma_lst, beta_lst, num=3
 		number of bins in each x axis
 	T : float
 		amount of time to run integration
+	supplement : bool
+		If true, collect data for the supplemental figure
 	"""
 	data_folder = Path("param_vary_data")
 	data_folder.mkdir(parents=True, exist_ok=True)
@@ -285,7 +289,7 @@ def collect_data_param_variation(a_lst, b_lst, c_lst, sigma_lst, beta_lst, num=3
 	c = c_lst[0]
 	sigma = sigma_lst[0]
 	beta = beta_lst[0]
-	
+
 	# Compute a variations
 	latency_vary_a = []
 	abruptness_vary_a = []
@@ -456,13 +460,13 @@ def collect_data_param_variation(a_lst, b_lst, c_lst, sigma_lst, beta_lst, num=3
 	
 	# Collect data for random parameter variations
 	print("Collecting Random Parameter Variations")
-	# Compute mean landa_eta, lambda_1, lambda_2
-	landa_eta_mean = N**2/a
-	lambda_1_mean = c * landa_eta_mean
-	lambda_2_mean = b/2 * landa_eta_mean
+	# Compute mean lambda_eta, lambda_1, lambda_2
+	lambda_eta_mean = N**2/a
+	lambda_1_mean = c * lambda_eta_mean
+	lambda_2_mean = b/2 * lambda_eta_mean
 	
-	# Sample 25 random parameters from an exponential distribution
-	landa_etas = get_exp_params(landa_eta_mean, num)
+	# Sample num random parameters from an exponential distribution
+	lambda_etas = get_exp_params(lambda_eta_mean, num)
 	lambda_1s = get_exp_params(lambda_1_mean, num)
 	lambda_2s = get_exp_params(lambda_2_mean, num)
 
@@ -475,9 +479,9 @@ def collect_data_param_variation(a_lst, b_lst, c_lst, sigma_lst, beta_lst, num=3
 	abruptness_random = []
 	accuracies_random = []
 	for i in tqdm(range(num)):
-		tmp_a = N**2/landa_etas[i]
-		tmp_b = 2*lambda_2s[i]/landa_etas[i]
-		tmp_c = lambda_1s[i]/landa_etas[i]
+		tmp_a = N**2/lambda_etas[i]
+		tmp_b = 2*lambda_2s[i]/lambda_etas[i]
+		tmp_c = lambda_1s[i]/lambda_etas[i]
 
 		# Get results
 		t,ps,msg = get_dist(samples, tmp_a, tmp_b, tmp_c, N=N, T=T)
@@ -516,7 +520,7 @@ def plot_random_curves():
 	ax.set_ylabel("Accuracy")
 	ax.set_xlabel("Time")
 	# save figure
-	fig.savefig("fig4.pdf", format='pdf', dpi=500)
+	fig.savefig("fig5.pdf", format='pdf', dpi=500)
 	return
 
 def plot_param_variation():
@@ -695,7 +699,7 @@ def plot_param_variation():
 
 
 	# save figure
-	fig.savefig("fig3a.pdf", format='pdf', dpi=500)
+	fig.savefig("fig4a.pdf", format='pdf', dpi=500)
 
 	# create figure for task variation
 	fig_task,axes_task = plt.subplots(1,2, figsize=(3.7,1.7), layout="constrained")
@@ -741,7 +745,7 @@ def plot_param_variation():
 
 
 	# save figure
-	fig_task.savefig("fig5.pdf", format='pdf', dpi=500)
+	fig_task.savefig("fig6.pdf", format='pdf', dpi=500)
 
 	# fitted curve latency vs abruptness (Figure 3c)
 	fit_curve_f3 = f3(np.sort(abruptness_random), k0, k1)
@@ -759,7 +763,7 @@ def plot_param_variation():
 	ax_rand.plot(np.sort(abruptness_random), fit_curve_f3/10**3, 'g-')
 	ax_rand.annotate(r"$\tau\propto \rho^{-1}$", (.3,.3), xycoords='axes fraction', c='green')
 
-	fig_rand.savefig('fig3b.pdf', format='pdf', dpi=500)
+	fig_rand.savefig('fig4b.pdf', format='pdf', dpi=500)
 
 	return k0,k1,r_square_f0,r_square_f1,r_square_f2, r_square_f3
 
@@ -775,31 +779,31 @@ def plot_MI():
 	"""
 
 	def h(p):
-	    """Calculate binary entropy"""
-	    p = np.asarray(p) # Ensure input is array for vectorized ops
-	    # Use np.where to handle 0*log(0) = 0
-	    term1 = np.where(p == 0, 0.0, p * np.log(p))
-	    term2 = np.where(p == 1, 0.0, (1 - p) * np.log(1 - p))
-	    # Entropy is non-negative, ensure result is >= 0
-	    result = -(term1 + term2)
-	    return np.maximum(0.0, result) # Clamp potential small negative due to precision
+		"""Calculate binary entropy"""
+		p = np.asarray(p) # Ensure input is array for vectorized ops
+		# Use np.where to handle 0*log(0) = 0
+		term1 = np.where(p == 0, 0.0, p * np.log(p))
+		term2 = np.where(p == 1, 0.0, (1 - p) * np.log(1 - p))
+		# Entropy is non-negative, ensure result is >= 0
+		result = -(term1 + term2)
+		return np.maximum(0.0, result) # Clamp potential small negative due to precision
 
 	# Define the function V(p0, p1) = exp(I[x;y])
 	def V(p0, p1):
-	    """Calculates exp(Mutual Information) for given P(y=1|x=0) and P(y=1|x=1)."""
-	    p0 = np.asarray(p0)
-	    p1 = np.asarray(p1)
+		"""Calculates exp(Mutual Information) for given P(y=1|x=0) and P(y=1|x=1)."""
+		p0 = np.asarray(p0)
+		p1 = np.asarray(p1)
 
-	    # Calculate H[Y]
-	    H_Y = h(0.5 * (p0 + p1))
+		# Calculate H[Y]
+		H_Y = h(0.5 * (p0 + p1))
 
-	    # Calculate H[Y|X]
-	    H_YcondX = 0.5 * h(p0) + 0.5 * h(p1)
+		# Calculate H[Y|X]
+		H_YcondX = 0.5 * h(p0) + 0.5 * h(p1)
 
-	    # Calculate mutual information I[X;Y] = H[Y] - H[Y|X]
-	    IMI = np.maximum(0.0, H_Y - H_YcondX)
+		# Calculate mutual information I[X;Y] = H[Y] - H[Y|X]
+		IMI = np.maximum(0.0, H_Y - H_YcondX)
 
-	    return np.exp(IMI)
+		return np.exp(IMI)
 
 	# Create grid of coordinates
 	num_points = 200 # Resolution of the grid
@@ -816,13 +820,13 @@ def plot_MI():
 
 	# display heatmap
 	im = ax.imshow(V_grid,
-	               origin='lower',
-	               extent=[0, 1, 0, 1],
-	               cmap=cmap_white_red,
-	               vmin=1,
-	               vmax=2,
-	               aspect='equal'
-	              )
+				   origin='lower',
+				   extent=[0, 1, 0, 1],
+				   cmap=cmap_white_red,
+				   vmin=1,
+				   vmax=2,
+				   aspect='equal'
+				  )
 
 	# set labels
 	ax.set_xlabel(r"$P(y=1|x=0)$", labelpad=2)
@@ -833,8 +837,8 @@ def plot_MI():
 
 	# Image border
 	for spine in ax.spines.values():
-	    spine.set_edgecolor('black')
-	    spine.set_linewidth(2.0)
+		spine.set_edgecolor('black')
+		spine.set_linewidth(2.0)
 
 	# Colorbar
 	cbar = fig.colorbar(im, ax=ax, fraction=0.05, pad=0.04)
@@ -844,14 +848,7 @@ def plot_MI():
 	cbar.ax.tick_params(labelsize=10)
 
 
-	fig.savefig("fig6a.pdf", format='pdf', dpi=500)
-
-def plot_population_curves():
-	"""
-	Given random parameter variation data, plot the various learning curves
-	and a the population-averaged curve.
-	"""
-
+	fig.savefig("fig7a.pdf", format='pdf', dpi=500)
 
 
 def plot_random_task(a, b, c, N=100, T=3000, p0=None, discourage=False):
@@ -921,22 +918,22 @@ def plot_random_task(a, b, c, N=100, T=3000, p0=None, discourage=False):
 
 	# Create first line to bottom-left of inset
 	con1 = ConnectionPatch(
-	    xyA=xyA, coordsA=ax.transAxes,
-	    xyB=xyB_corner1, coordsB=axins.transAxes,
-	    arrowstyle="-", 
-	    linestyle="--",
-	    color="gray",
-	    linewidth=1.0
+		xyA=xyA, coordsA=ax.transAxes,
+		xyB=xyB_corner1, coordsB=axins.transAxes,
+		arrowstyle="-", 
+		linestyle="--",
+		color="gray",
+		linewidth=1.0
 	)
 
 	# Create second line to bottom right of inset
 	con2 = ConnectionPatch(
-	    xyA=xyA, coordsA=ax.transAxes,
-	    xyB=xyB_corner2, coordsB=axins.transAxes,
-	    arrowstyle="-",
-	    linestyle="--",
-	    color="gray",
-	    linewidth=1.0
+		xyA=xyA, coordsA=ax.transAxes,
+		xyB=xyB_corner2, coordsB=axins.transAxes,
+		arrowstyle="-",
+		linestyle="--",
+		color="gray",
+		linewidth=1.0
 	)
 
 	fig.add_artist(con1)
@@ -962,22 +959,22 @@ def plot_random_task(a, b, c, N=100, T=3000, p0=None, discourage=False):
 
 	# Create first line to bottom-left of inset
 	con3 = ConnectionPatch(
-	    xyA=xyA, coordsA=ax.transAxes,
-	    xyB=xyB_corner1, coordsB=axins2.transAxes,
-	    arrowstyle="-", 
-	    linestyle="--",
-	    color="gray",
-	    linewidth=1.0
+		xyA=xyA, coordsA=ax.transAxes,
+		xyB=xyB_corner1, coordsB=axins2.transAxes,
+		arrowstyle="-", 
+		linestyle="--",
+		color="gray",
+		linewidth=1.0
 	)
 
 	# Create second line to bottom right of inset
 	con4 = ConnectionPatch(
-	    xyA=xyA, coordsA=ax.transAxes,
-	    xyB=xyB_corner2, coordsB=axins2.transAxes,
-	    arrowstyle="-",
-	    linestyle="--",
-	    color="gray",
-	    linewidth=1.0
+		xyA=xyA, coordsA=ax.transAxes,
+		xyB=xyB_corner2, coordsB=axins2.transAxes,
+		arrowstyle="-",
+		linestyle="--",
+		color="gray",
+		linewidth=1.0
 	)
 
 	fig.add_artist(con3)
@@ -993,9 +990,9 @@ def plot_random_task(a, b, c, N=100, T=3000, p0=None, discourage=False):
 	axins2.set_clip_on(False)
 
 	if discourage==False:
-		fig.savefig('fig6b.pdf', format='pdf', dpi=500)
+		fig.savefig('fig7b.pdf', format='pdf', dpi=500)
 	else:
-		fig.savefig('fig6c.pdf', format='pdf', dpi=500)
+		fig.savefig('fig7c.pdf', format='pdf', dpi=500)
 
 	# return average change in probs at end of curve
 	delta_p = np.abs(ps[int(T*0.9)] - ps[-1]).mean()
@@ -1047,7 +1044,7 @@ def single_plot_wrong_inp_marg(a, b, c, sigma, beta, N=100, T=1000, p0=None):
 
 	fig = plt.figure(constrained_layout=True, figsize=(2.9,1.7))
 	axs = fig.subplot_mosaic([['Left', 'TopRight'],['Left', 'BottomRight']],
-                          gridspec_kw={'width_ratios':[2, 1]})
+						  gridspec_kw={'width_ratios':[2, 1]})
 	ax_res = axs['Left']
 	ax_res.plot(t, accuracy, 'k')
 	ax_res.set_ylim(top=1.0)
@@ -1064,7 +1061,7 @@ def single_plot_wrong_inp_marg(a, b, c, sigma, beta, N=100, T=1000, p0=None):
 	axs['BottomRight'].set_xticks([])
 	axs['BottomRight'].set_yticks([])
 
-	fig.savefig('fig10.pdf', format='pdf', dpi=500)
+	fig.savefig('fig11.pdf', format='pdf', dpi=500)
 
 
 def single_plot_biased_truth(a, b, c, sigma, beta, N=100, T=1000, p0=None):
@@ -1109,7 +1106,7 @@ def single_plot_biased_truth(a, b, c, sigma, beta, N=100, T=1000, p0=None):
 
 	fig = plt.figure(constrained_layout=True, figsize=(2.9,1.7))
 	axs = fig.subplot_mosaic([['Left', 'TopRight'],['Left', 'BottomRight']],
-                          gridspec_kw={'width_ratios':[2, 1]})
+						  gridspec_kw={'width_ratios':[2, 1]})
 	ax_res = axs['Left']
 	ax_res.plot(t, accuracy, 'k')
 	ax_res.set_ylim(top=1.0)
@@ -1126,7 +1123,7 @@ def single_plot_biased_truth(a, b, c, sigma, beta, N=100, T=1000, p0=None):
 	axs['BottomRight'].set_xticks([])
 	axs['BottomRight'].set_yticks([])
 
-	fig.savefig('fig9.pdf', format='pdf', dpi=500)
+	fig.savefig('fig10.pdf', format='pdf', dpi=500)
 
 
 def single_plot_nolog(a, b, c, sigma, beta, N=100, T=1000, p0=None):
@@ -1169,7 +1166,7 @@ def single_plot_nolog(a, b, c, sigma, beta, N=100, T=1000, p0=None):
 
 	fig = plt.figure(constrained_layout=True, figsize=(2.9,1.7))
 	axs = fig.subplot_mosaic([['Left', 'TopRight'],['Left', 'BottomRight']],
-                          gridspec_kw={'width_ratios':[2, 1]})
+						  gridspec_kw={'width_ratios':[2, 1]})
 	ax_res = axs['Left']
 	ax_res.plot(t, accuracy, 'k')
 	ax_res.set_ylim(top=1.0)
@@ -1186,7 +1183,7 @@ def single_plot_nolog(a, b, c, sigma, beta, N=100, T=1000, p0=None):
 	axs['BottomRight'].set_xticks([])
 	axs['BottomRight'].set_yticks([])
 
-	fig.savefig('fig8a.pdf', format='pdf', dpi=500)
+	fig.savefig('fig9a.pdf', format='pdf', dpi=500)
 
 
 # make superstition plot for modified prior.
@@ -1257,22 +1254,22 @@ def plot_random_task_nolog(a, b, c, N=100, T=3000, p0=None, discourage=False):
 
 	# Create first line to bottom-left of inset
 	con1 = ConnectionPatch(
-	    xyA=xyA, coordsA=ax.transAxes,
-	    xyB=xyB_corner1, coordsB=axins.transAxes,
-	    arrowstyle="-", 
-	    linestyle="--",
-	    color="gray",
-	    linewidth=1.0
+		xyA=xyA, coordsA=ax.transAxes,
+		xyB=xyB_corner1, coordsB=axins.transAxes,
+		arrowstyle="-", 
+		linestyle="--",
+		color="gray",
+		linewidth=1.0
 	)
 
 	# Create second line to bottom right of inset
 	con2 = ConnectionPatch(
-	    xyA=xyA, coordsA=ax.transAxes,
-	    xyB=xyB_corner2, coordsB=axins.transAxes,
-	    arrowstyle="-",
-	    linestyle="--",
-	    color="gray",
-	    linewidth=1.0
+		xyA=xyA, coordsA=ax.transAxes,
+		xyB=xyB_corner2, coordsB=axins.transAxes,
+		arrowstyle="-",
+		linestyle="--",
+		color="gray",
+		linewidth=1.0
 	)
 
 	fig.add_artist(con1)
@@ -1298,22 +1295,22 @@ def plot_random_task_nolog(a, b, c, N=100, T=3000, p0=None, discourage=False):
 
 	# Create first line to bottom-left of inset
 	con3 = ConnectionPatch(
-	    xyA=xyA, coordsA=ax.transAxes,
-	    xyB=xyB_corner1, coordsB=axins2.transAxes,
-	    arrowstyle="-", 
-	    linestyle="--",
-	    color="gray",
-	    linewidth=1.0
+		xyA=xyA, coordsA=ax.transAxes,
+		xyB=xyB_corner1, coordsB=axins2.transAxes,
+		arrowstyle="-", 
+		linestyle="--",
+		color="gray",
+		linewidth=1.0
 	)
 
 	# Create second line to bottom right of inset
 	con4 = ConnectionPatch(
-	    xyA=xyA, coordsA=ax.transAxes,
-	    xyB=xyB_corner2, coordsB=axins2.transAxes,
-	    arrowstyle="-",
-	    linestyle="--",
-	    color="gray",
-	    linewidth=1.0
+		xyA=xyA, coordsA=ax.transAxes,
+		xyB=xyB_corner2, coordsB=axins2.transAxes,
+		arrowstyle="-",
+		linestyle="--",
+		color="gray",
+		linewidth=1.0
 	)
 
 	fig.add_artist(con3)
@@ -1329,11 +1326,188 @@ def plot_random_task_nolog(a, b, c, N=100, T=3000, p0=None, discourage=False):
 	axins2.set_clip_on(False)
 
 	if discourage==False:
-		fig.savefig('fig8b.pdf', format='pdf', dpi=500)
+		fig.savefig('fig9b.pdf', format='pdf', dpi=500)
 	else:
-		fig.savefig('fig8c.pdf', format='pdf', dpi=500)
+		fig.savefig('fig9c.pdf', format='pdf', dpi=500)
 
 	# return average change in probs at end of curve
 	delta_p = np.abs(ps[int(T*0.9)] - ps[-1]).mean()
 
 	return delta_p
+
+
+
+def plot_mouse_labyrinth_data():
+	"""
+	Plot sigmoid fits latencies vs. widths using the data from the paper
+	Mice in a labyrinth show rapid learning, sudden insight, and efficient exploration.
+	Also calculates and plots linear fits for the data.
+	"""
+
+	# --- Data from the paper ---
+	# reward latencies and widths
+	rew_lat = np.array([1500, 1930, 3800, 1470, 1370, 807, 1020, 1670, 1780, 12100])
+	rew_w = np.array([994, 10, 1230, 2440, 10, 2060, 10, 10, 1200, 7130])
+	# efficient path latencies and widths
+	eff_lat = np.array([2570, 2340, 3020, 3340, 2140, 1270, 2970, 1660, 2330, 2780])
+	eff_w = np.array([10, 10, 1870, 1520, 139, 10, 268, 10, 1110, 1970])
+
+	# --- Scaling for plot axes ---
+	scale_widths = 0.001
+	scale_lat = 0.001
+	
+	# Scale the data for fitting and plotting
+	scaled_rew_lat = rew_lat * scale_lat
+	scaled_rew_w = rew_w * scale_widths
+	scaled_eff_lat = eff_lat * scale_lat
+	scaled_eff_w = eff_w * scale_widths
+
+	# --- Perform Linear Fits ---
+	# Fit for the reward data (red)
+	rew_slope, rew_intercept = np.polyfit(scaled_rew_lat, scaled_rew_w, 1)
+	
+	# Fit for the efficient path data (blue)
+	eff_slope, eff_intercept = np.polyfit(scaled_eff_lat, scaled_eff_w, 1)
+
+	# --- Print Results ---
+	print("--- Linear Fit Results ---")
+	print(f"Reward Data (Red):")
+	print(f"  Slope: {rew_slope:.4f}")
+	print(f"  Intercept: {rew_intercept:.4f}\n")
+	
+	print(f"Efficient Path Data (Blue):")
+	print(f"  Slope: {eff_slope:.4f}")
+	print(f"  Intercept: {eff_intercept:.4f}")
+	print("--------------------------")
+
+	# --- Plotting ---
+	fig, ax = plt.subplots(figsize=(2.25, 1.85), layout="constrained")
+	ax.set_xlabel(r'Latency ($10^3$ s)')
+	ax.set_ylabel(r'Width ($10^3$ s)')
+	
+	# Plot for the learning curve when finding the reward
+	ax.scatter(scaled_rew_lat, scaled_rew_w, c='red', marker='o', alpha=0.5, s=15, label='Reward')
+
+	# Plot for the learning curve when finding an efficient path
+	ax.scatter(scaled_eff_lat, scaled_eff_w, c='blue', marker='o', alpha=0.5, s=15, label='Path')
+
+	# Plot the linear fit lines
+	rew_x_fit = np.linspace(min(scaled_rew_lat.min(), scaled_eff_lat.min()), max(scaled_rew_lat.max(), scaled_eff_lat.max()), 100)
+	rew_y_fit = rew_slope * rew_x_fit + rew_intercept
+	ax.plot(rew_x_fit, rew_y_fit, linestyle='-', c='red', alpha=0.8)
+
+	eff_x_fit = np.linspace(min(scaled_rew_lat.min(), scaled_eff_lat.min()), max(scaled_rew_lat.max(), scaled_eff_lat.max()), 100)
+	eff_y_fit = eff_slope * eff_x_fit + eff_intercept
+	ax.plot(eff_x_fit, eff_y_fit, linestyle='-', c='blue', alpha=0.8)
+
+	ax.legend()
+
+	# Save figure
+	fig.savefig("fig12.pdf", format='pdf', dpi=500)
+
+	
+
+# Distribution of latencies over x, and variance of fluctuations over time
+def plot_grokking(a=0.001, bs=[0.0001, 0.01, 1.5], c=0.01, sigma=20, beta=50, N=100, T=2000, p0=None):
+	"""
+	Compare how latencies and fluctuations vary over the input domain
+	while varying the reguralization parameter b
+	"""
+	T = int(T)
+	# Generate true distribution
+	truth = gen_dist_cond(sigma, beta, N=N)
+	# Generate 2*T samples from the ground truth
+	samples = gen_samples_cond(2*T,truth)
+
+	# get learnign curve for each value of b
+	learning_curves = []
+	for b in bs:
+		# Get results
+		t,ps,msg = get_dist(samples, a, b, c, p0=p0, N=N, T=T)
+		learning_curves.append(ps[:,:,:,0].reshape(T,-1))
+	"""
+	
+	# plot distributions of latencies over x
+	def compute_latencies(ps):
+		"""
+		Given the learned conditional distribution over time,
+		compute the onset latencies for each transition.
+
+		Onset latency is the time it takes for the transition to
+		be (e-1)/(e+1) fraction complete.
+		"""
+
+		# Compute fractional difference between each dist and the final
+		pf = ps[-1,None] # final dists for each trajectory
+		pi = ps[0,None] # initial dists for each trajectory
+		fraction_diffs = 1-np.abs(pf - ps)/np.abs(pf-pi)
+
+		# Compute latencies as the first time when fractional diff > cutoff
+		latencies = np.argmax(fraction_diffs > (np.e-1)/(np.e+1), axis=0)
+
+		return latencies
+	"""
+	# first compute latencies
+	all_latencies = []
+	for i,b in enumerate(bs):
+		all_latencies.append(compute_latencies(learning_curves[i]))
+
+	
+	colors = ['red', 'blue', 'black']
+	labels = [f'$b=${bs[0]}', f'$b=${bs[1]}', f'$b=${bs[2]}']
+	
+	# make histogram
+	fig_hist, ax_hist = plt.subplots(constrained_layout=True, figsize=(2.9,1.7))
+
+	for i, b in enumerate(bs):
+		sns.histplot(data=all_latencies[i], color=colors[i], alpha=0.5, kde=True, label=labels[i], ax=ax_hist, element='step')
+
+	ax_hist.legend(prop={'size':8}, loc='upper left')
+	ax_hist.set_xlabel(r'Latencies $\tau_{x,y}$')
+	ax_hist.set_ylabel('Frequency')
+	fig_hist.savefig("fig8a.pdf", format='pdf', dpi=500)
+	
+	# plot variance in fluctuations over time
+	# get learning curves when c=0
+	learning_curves = []
+	for b in bs:
+		# Get results
+		t,ps,msg = get_dist(samples, a, b, 0, p0=p0, N=N, T=200)
+		learning_curves.append(ps[:,:,:,0].reshape(200,-1))
+
+	fig_var, ax_var = plt.subplots(constrained_layout=True, figsize=(2.9,1.7))
+	for i, b in enumerate(bs):
+		second_moment = (np.abs(learning_curves[i]-1/2)**2).mean(axis=-1)
+		mean = np.abs(learning_curves[i]-1/2).mean(axis=-1)
+		var = second_moment-mean**2
+		ax_var.plot(range(200), var, color=colors[i], label=labels[i])
+	ax_var.set_xlabel('Time')
+	ax_var.set_ylabel('Variance')
+	ax_var.legend(prop={'size':8})
+	fig_var.savefig("fig8b.pdf", format='pdf', dpi=500)
+
+
+	# plot for grokking
+	samples = samples[:50]
+	samples = np.tile(samples, [T//len(samples) * 2,1])
+
+	a = 0.1
+	b = 0.0001
+	t,ps,msg = get_dist(samples, a, b, c, p0=p0, N=N, T=T)
+	ps = ps[:,:,:,0].reshape(T,-1)
+	latencies = compute_latencies(ps)
+
+	fig_hist2, ax_hist2 = plt.subplots(constrained_layout=True, figsize=(2.9,1.7))
+	sns.histplot(data=latencies, color='green', alpha=0.5, kde=True, label=f'$a=${a}, $b=${b}', ax=ax_hist2, element='step', binwidth=25)
+
+	ax_hist2.legend(prop={'size':8})
+	ax_hist2.set_xlabel(r'Latencies $\tau_{x,y}$')
+	ax_hist2.set_ylabel('Frequency')
+	ax_hist2.set_ylim(top=600)
+	fig_hist2.savefig("fig8c.pdf", format='pdf', dpi=500)
+
+
+		
+
+
+
